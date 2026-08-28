@@ -36,7 +36,69 @@ async function safeParseResponse(res: Response): Promise<{ data: any; isJson: bo
   }
 }
 
-// 1. HeyVoila API: Get Presets (GET /api/couriers/v1/:courier/presets)
+// 1. HeyVoila / MoovParcel API: Get Presets (GET /api/couriers/v1/MoovParcel/presets)
+export async function getMoovParcelPresets(
+  credentials: ApiCredentials
+): Promise<{ presets: VoilaPreset[]; fromLive: boolean; error?: string }> {
+  const startTime = Date.now();
+  const endpoint = `/api/proxy/presets/MoovParcel`;
+  const headers: Record<string, string> = {
+    'api-user': credentials.voilaApiUser || '',
+    'api-token': credentials.voilaApiToken || '',
+    'api-key': credentials.voilaApiToken || '',
+  };
+
+  try {
+    const res = await fetch(endpoint, {
+      headers,
+      method: 'GET',
+    });
+
+    const { data, isJson } = await safeParseResponse(res);
+    const durationMs = Date.now() - startTime;
+
+    emitLog({
+      id: Math.random().toString(36).substring(7),
+      timestamp: new Date().toLocaleTimeString(),
+      endpoint: `https://app.heyvoila.io/api/couriers/v1/MoovParcel/presets`,
+      method: 'GET',
+      headers,
+      responseStatus: res.status,
+      responseBody: data,
+      durationMs,
+      success: res.ok && isJson && Array.isArray(data),
+      source: 'live'
+    });
+
+    if (!res.ok || !Array.isArray(data)) {
+      const errorMsg = Array.isArray(data) ? null : (data?.error || (typeof data === 'string' ? data : JSON.stringify(data)));
+      return {
+        presets: [],
+        fromLive: false,
+        error: errorMsg || `HTTP ${res.status}: Failed to fetch MoovParcel presets`
+      };
+    }
+
+    return { presets: data, fromLive: true };
+  } catch (err: any) {
+    const durationMs = Date.now() - startTime;
+    emitLog({
+      id: Math.random().toString(36).substring(7),
+      timestamp: new Date().toLocaleTimeString(),
+      endpoint: `https://app.heyvoila.io/api/couriers/v1/MoovParcel/presets`,
+      method: 'GET',
+      headers,
+      responseStatus: 500,
+      responseBody: { error: err.message },
+      durationMs,
+      success: false,
+      source: 'live'
+    });
+    return { presets: [], fromLive: false, error: err.message };
+  }
+}
+
+// 1b. Generic Courier Presets
 export async function getCourierPresets(
   courier: string,
   credentials: ApiCredentials
@@ -46,6 +108,7 @@ export async function getCourierPresets(
   const headers: Record<string, string> = {
     'api-user': credentials.voilaApiUser,
     'api-token': credentials.voilaApiToken,
+    'api-key': credentials.voilaApiToken,
   };
 
   if (!credentials.useLiveApi) {

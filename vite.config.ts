@@ -102,20 +102,21 @@ function apiProxyPlugin(): Plugin {
             return sendJsonResponse(upstreamRes.status, parsedData);
           }
 
-          // 3. HeyVoila Presets: /api/proxy/presets/:courier
+          // 3. HeyVoila / MoovParcel Presets: /api/proxy/presets/:courier
           if (urlPath.startsWith('/api/proxy/presets/') && req.method === 'GET') {
             const courier = decodeURIComponent(urlPath.replace('/api/proxy/presets/', ''));
             const apiUser = (req.headers['api-user'] as string) || '';
-            const apiToken = (req.headers['api-token'] as string) || '';
+            const apiToken = (req.headers['api-token'] as string) || (req.headers['api-key'] as string) || '';
 
             const targetUrl = `https://app.heyvoila.io/api/couriers/v1/${encodeURIComponent(courier)}/presets`;
-            console.log(`[VITE PROXY -> HeyVoila] Fetching presets for "${courier}" at ${targetUrl}`);
+            console.log(`[VITE PROXY -> HeyVoila] GET presets for "${courier}" at ${targetUrl} (user: "${apiUser}")`);
 
             const upstreamRes = await fetch(targetUrl, {
               method: 'GET',
               headers: {
                 'api-user': apiUser,
                 'api-token': apiToken,
+                'api-key': apiToken,
                 'Content-Type': 'application/json',
               },
             });
@@ -125,9 +126,10 @@ function apiProxyPlugin(): Plugin {
             try {
               parsedData = JSON.parse(text);
             } catch (err) {
-              console.warn(`[VITE PROXY] HeyVoila presets returned non-JSON (${upstreamRes.status}):`, text.substring(0, 200));
+              console.warn(`[VITE PROXY] Presets returned non-JSON (${upstreamRes.status}):`, text.substring(0, 200));
               return sendJsonResponse(upstreamRes.status, {
-                error: `Upstream HeyVoila returned non-JSON response (HTTP ${upstreamRes.status})`,
+                error: `Upstream Presets returned non-JSON response (HTTP ${upstreamRes.status})`,
+                status: upstreamRes.status,
                 raw: text.substring(0, 300)
               });
             }
