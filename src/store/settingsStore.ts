@@ -1,4 +1,5 @@
 import { ApiCredentials, ConfiguredService, CourierConfig, PricingRule, DropShopSettings } from '../types/settings';
+import { emptyConditions } from '../services/pricingRules';
 import { ApiLogEntry } from '../types/api';
 import { INITIAL_COURIERS } from '../services/mockData';
 import { setApiLogListener } from '../services/api';
@@ -6,9 +7,36 @@ import { setApiLogListener } from '../services/api';
 // v4: the fictional default services (UPS-STANDARD, DPD-NEXT-DAY,
 // DPD-PICKUP, UPS-ACCESS-POINT) were removed. Bumping the key stops them
 // being resurrected from a browser that still holds the old list.
-// v5: single markupType/markupValue/freeShippingThreshold replaced by an
-// ordered list of pricing rules.
-const STORAGE_KEY = 'checkout_demo_settings_v5';
+/**
+ * Stable storage key. DO NOT BUMP THIS AGAIN.
+ *
+ * Bumping the key for a schema change silently discards the merchant's
+ * configuration — it cost this user their service selections twice. Schema
+ * changes are handled by migrateSettings() below, which reads whatever shape is
+ * on disk and brings it forward. Add a migration step, raise SCHEMA_VERSION,
+ * and leave the key alone.
+ */
+const STORAGE_KEY = 'checkout_demo_settings';
+const SCHEMA_VERSION = 3;
+
+/** Older keys, newest first. Read once to rescue configuration written before
+ *  the stable key existed. */
+const LEGACY_STORAGE_KEYS = [
+  'checkout_demo_settings_v5',
+  'checkout_demo_settings_v4',
+  'checkout_demo_settings_v3',
+];
+
+/** Service codes that never existed upstream. Never resurrect them. */
+const FICTIONAL_SERVICE_IDS = new Set([
+  'UPS-STANDARD',
+  'DPD-NEXT-DAY',
+  'DPD-PICKUP',
+  'UPS-ACCESS-POINT',
+  'DPD-12PM',
+  'UPS-EXPRESS-SAVER',
+]);
+
 const PERMANENT_CREDENTIALS_KEY = 'checkout_demo_credentials_permanent';
 
 /**
@@ -92,6 +120,94 @@ function loadPersistedCredentials(): ApiCredentials {
   return result;
 }
 
+
+/**
+ * Read whatever settings exist, from the stable key or any legacy key, and
+ * bring the shape forward. Returns null when nothing has ever been saved.
+ */
+function readStoredSettings(): any | null {
+  if (typeof window === 'undefined' || !window.localStorage) return null;
+
+  const keys = [STORAGE_KEY, ...LEGACY_STORAGE_KEYS];
+  for (const key of keys) {
+    const raw = localStorage.getItem(key);
+    if (!raw) continue;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        return migrateSettings(parsed);
+      }
+    } catch (e) {
+      // Corrupt entry — try the next key rather than losing everything.
+    }
+  }
+  return null;
+}
+
+/**
+ * Bring any previously stored shape up to the current one. Every step must be
+ * safe to run on already-current data, because the stable key is re-read on
+ * every load.
+ */
+export function migrateSettings(parsed: any): any {
+  const out = { ...parsed };
+
+  // Services: drop the fabricated ones and anything for a courier that was
+  // removed, and make sure the doorstep/pickup flag exists.
+  if (Array.isArray(out.services)) {
+    out.services = out.services
+      .filter((s: any) => s && s.dc_service_id)
+      .filter((s: any) => !FICTIONAL_SERVICE_IDS.has(s.dc_service_id))
+      .filter((s: any) => s.courier !== 'InPost')
+      .map((s: any) => ({ ...s, isDropShop: Boolean(s.isDropShop) }));
+  }
+
+  // Legacy single-markup pricing -> ordered rule list.
+  if (!Array.isArray(out.pricingRules)) {
+    const legacy = out.pricing;
+    const rules: PricingRule[] = [];
+
+    if (legacy && typeof legacy === 'object') {
+      // Free-over-threshold ran regardless of markup, so it goes first and stops.
+      if (legacy.freeShippingThreshold != null) {
+        rules.push({
+          id: 'migrated_free_threshold',
+          name: `Free delivery over £${legacy.freeShippingThreshold}`,
+          enabled: true,
+          conditions: { ...emptyConditions(), minOrderValue: Number(legacy.freeShippingThreshold) },
+          action: { type: 'free' },
+          stopIfMatched: true,
+        });
+      }
+      if (legacy.markupType === 'fixed' && Number(legacy.markupValue) > 0) {
+        rules.push({
+          id: 'migrated_markup',
+          name: 'Handling surcharge',
+          enabled: true,
+          conditions: emptyConditions(),
+          action: { type: 'add_fixed', amount: Number(legacy.markupValue) },
+          stopIfMatched: false,
+        });
+      } else if (legacy.markupType === 'percentage' && Number(legacy.markupValue) > 0) {
+        rules.push({
+          id: 'migrated_markup',
+          name: 'Margin',
+          enabled: true,
+          conditions: emptyConditions(),
+          action: { type: 'add_percentage', percent: Number(legacy.markupValue) },
+          stopIfMatched: false,
+        });
+      }
+    }
+
+    out.pricingRules = rules;
+  }
+  delete out.pricing;
+
+  out.schemaVersion = SCHEMA_VERSION;
+  return out;
+}
+
 export class SettingsStore {
   private static instance: SettingsStore;
   private subscribers = new Set<() => void>();
@@ -110,17 +226,16 @@ export class SettingsStore {
     this.pricingRules = [...DEFAULT_PRICING_RULES];
     this.dropShop = DEFAULT_DROPSHOP;
 
-    const saved = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
-    if (saved) {
+    const parsed = readStoredSettings();
+    if (parsed) {
       try {
-        const parsed = JSON.parse(saved);
         if (parsed.credentials) {
           this.credentials = { ...this.credentials, ...parsed.credentials };
         }
         this.couriers = parsed.couriers || INITIAL_COURIERS;
-        // Cleanse services to remove InPost or other disabled/non-existent couriers
-        const loadedServices: ConfiguredService[] = parsed.services || INITIAL_SERVICES;
-        this.services = loadedServices.filter((s) => s.courier !== 'InPost');
+        // migrateSettings has already stripped fictional and removed-courier
+        // services, so this is just the assignment.
+        this.services = Array.isArray(parsed.services) ? parsed.services : INITIAL_SERVICES;
         if (Array.isArray(parsed.pricingRules)) this.pricingRules = parsed.pricingRules;
         this.dropShop = { ...DEFAULT_DROPSHOP, ...(parsed.dropShop || {}) };
         // Ensure dropShop enabledCouriers doesn't include InPost
@@ -194,6 +309,7 @@ export class SettingsStore {
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
+        schemaVersion: SCHEMA_VERSION,
         credentials: this.credentials,
         couriers: this.couriers,
         services: this.services,
