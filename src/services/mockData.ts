@@ -66,28 +66,28 @@ export const INITIAL_COURIERS: CourierConfig[] = [
     enabled: true,
   },
   {
-    key: "Yodel",
-    name: "Yodel",
-    logo: "https://app.heyvoila.io/courier-service-logos/yodel.jpg",
-    enabled: true,
-  },
-  {
     key: "UPS",
     name: "UPS",
     logo: "https://app.heyvoila.io/courier-service-logos/ups.jpg",
     enabled: true,
   },
   {
-    key: "InPost",
-    name: "InPost Lockers",
-    logo: "https://app.heyvoila.io/courier-service-logos/inpost.jpg",
+    key: "Yodel",
+    name: "Yodel",
+    logo: "https://app.heyvoila.io/courier-service-logos/yodel.jpg",
     enabled: true,
   },
   {
     key: "Evri",
     name: "Evri",
     logo: "https://app.heyvoila.io/courier-service-logos/evri.jpg",
-    enabled: false, // No live credentials
+    enabled: false,
+  },
+  {
+    key: "InPost",
+    name: "InPost",
+    logo: "https://app.heyvoila.io/courier-service-logos/inpost.jpg",
+    enabled: false,
   },
   {
     key: "DHLParcelUK",
@@ -142,35 +142,6 @@ export const MOCK_PRESETS_BY_COURIER: Record<string, VoilaPreset[]> = {
       rule_supported_countries: "GB"
     }
   ],
-  Yodel: [
-    {
-      id: 4501,
-      dc_service_id: "YODC2C",
-      api_user_id: 1,
-      courier: "Yodel",
-      name: "Yodel C2C Delivery",
-      lead_time: "2-3 Working Days Tracked",
-      rule_supported_countries: "GB"
-    },
-    {
-      id: 4502,
-      dc_service_id: "YODEL-DIRECT",
-      api_user_id: 1,
-      courier: "Yodel",
-      name: "Yodel Direct Next Day",
-      lead_time: "Next Working Day",
-      rule_supported_countries: "GB"
-    },
-    {
-      id: 4503,
-      dc_service_id: "YODEL-STORE",
-      api_user_id: 1,
-      courier: "Yodel",
-      name: "Yodel Store Collect Point",
-      lead_time: "2 Working Days to Store",
-      rule_supported_countries: "GB"
-    }
-  ],
   UPS: [
     {
       id: 6001,
@@ -200,34 +171,32 @@ export const MOCK_PRESETS_BY_COURIER: Record<string, VoilaPreset[]> = {
       rule_supported_countries: "GB"
     }
   ],
-  Evri: [
+  Yodel: [
     {
-      id: 5001,
-      dc_service_id: "EVRI-STANDARD",
+      id: 4501,
+      dc_service_id: "YODC2C",
       api_user_id: 1,
-      courier: "Evri",
-      name: "Evri Standard Tracked",
-      lead_time: "2-4 Business Days",
+      courier: "Yodel",
+      name: "Yodel C2C Delivery",
+      lead_time: "2-3 Working Days Tracked",
       rule_supported_countries: "GB"
     },
     {
-      id: 5002,
-      dc_service_id: "EVRI-NEXT-DAY",
+      id: 4502,
+      dc_service_id: "YODEL-DIRECT",
       api_user_id: 1,
-      courier: "Evri",
-      name: "Evri Next Day Delivery",
+      courier: "Yodel",
+      name: "Yodel Direct Next Day",
       lead_time: "Next Working Day",
       rule_supported_countries: "GB"
-    }
-  ],
-  InPost: [
+    },
     {
-      id: 9001,
-      dc_service_id: "INPOST-LOCKER-24",
+      id: 4503,
+      dc_service_id: "YODEL-STORE",
       api_user_id: 1,
-      courier: "InPost",
-      name: "InPost 24/7 Automated Locker",
-      lead_time: "Next Day 24/7 Access",
+      courier: "Yodel",
+      name: "Yodel Store Collect Point",
+      lead_time: "2 Working Days to Store",
       rule_supported_countries: "GB"
     }
   ]
@@ -238,12 +207,8 @@ export const MOCK_BILLING_QUOTES: Record<string, number> = {
   "YODC2C": 5.00,
   "DPD-NEXT-DAY": 4.95,
   "DPD-12PM": 7.50,
-  "DPD-SATURDAY": 9.99,
   "DPD-PICKUP": 3.49,
   "UPS-STANDARD": 4.49,
   "UPS-EXPRESS-SAVER": 6.95,
   "UPS-ACCESS-POINT": 3.20,
-  "EVRI-STANDARD": 2.99,
-  "EVRI-NEXT-DAY": 3.99,
-  "INPOST-LOCKER-24": 2.75
 };

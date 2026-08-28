@@ -78,18 +78,6 @@ const INITIAL_SERVICES: ConfiguredService[] = [
     isDropShop: true,
     badgeText: null,
     priceOverride: null,
-  },
-  {
-    dc_service_id: "INPOST-LOCKER-24",
-    courier: "InPost",
-    originalName: "InPost 24/7 Automated Locker",
-    displayName: "InPost 24/7 Parcel Locker",
-    leadTime: "Next Day 24/7 Pickup",
-    enabled: true,
-    priority: 7,
-    isDropShop: true,
-    badgeText: "24/7 Pickup",
-    priceOverride: null,
   }
 ];
 
@@ -115,7 +103,7 @@ const DEFAULT_DROPSHOP: DropShopSettings = {
   enabled: true,
   maxRadiusMiles: 5,
   maxLocations: 8,
-  enabledCouriers: ['DPD', 'UPS', 'Yodel', 'InPost'],
+  enabledCouriers: ['DPD', 'UPS', 'Yodel'],
 };
 
 // Helper to rescue credentials from any previous local storage keys
@@ -189,9 +177,13 @@ export class SettingsStore {
           this.credentials = { ...this.credentials, ...parsed.credentials };
         }
         this.couriers = parsed.couriers || INITIAL_COURIERS;
-        this.services = parsed.services || INITIAL_SERVICES;
+        // Cleanse services to remove InPost or other disabled/non-existent couriers
+        const loadedServices: ConfiguredService[] = parsed.services || INITIAL_SERVICES;
+        this.services = loadedServices.filter((s) => s.courier !== 'InPost');
         this.pricing = { ...DEFAULT_PRICING, ...(parsed.pricing || {}) };
         this.dropShop = { ...DEFAULT_DROPSHOP, ...(parsed.dropShop || {}) };
+        // Ensure dropShop enabledCouriers doesn't include InPost
+        this.dropShop.enabledCouriers = this.dropShop.enabledCouriers.filter((c) => c !== 'InPost');
       } catch (e) {}
     }
 
@@ -312,6 +304,21 @@ export class SettingsStore {
         this.services.push(s);
       }
     });
+    this.notify(true);
+  }
+
+  public deleteService(serviceId: string) {
+    this.services = this.services.filter((s) => s.dc_service_id !== serviceId);
+    this.notify(true);
+  }
+
+  public setServices(services: ConfiguredService[]) {
+    this.services = services;
+    this.notify(true);
+  }
+
+  public resetServicesToDefaults() {
+    this.services = [...INITIAL_SERVICES];
     this.notify(true);
   }
 

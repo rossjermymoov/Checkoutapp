@@ -87,17 +87,16 @@ export function getCustomerCentroid(customer: CustomerDetails): GeoCoord {
   };
 }
 
-// Regional Templates for Pickup Locations strictly mapped by Area
+// Regional Templates for Pickup Locations strictly mapped by Area (DPD, UPS, Yodel)
 const REGIONAL_STORES: Record<string, Array<{ name: string; street: string; town: string; postcode: string; courier: string; offsetLat: number; offsetLng: number; openLate: boolean }>> = {
   // Birmingham / Smethwick (B66 / B67 / B70)
   B66: [
     { name: 'Oldbury Express & Newsagents', street: 'Unit 10-1 West Cross Shopping Centre', town: 'Smethwick', postcode: 'B66 1JG', courier: 'DPD', offsetLat: 0.0046, offsetLng: -0.0060, openLate: true },
     { name: 'Cape Hill Post & Supermarket', street: '142 Cape Hill', town: 'Smethwick', postcode: 'B66 4SH', courier: 'Yodel', offsetLat: -0.0032, offsetLng: 0.0051, openLate: true },
     { name: 'Soho Road Access Point', street: '215 Soho Road', town: 'Handsworth, Birmingham', postcode: 'B21 9XJ', courier: 'UPS', offsetLat: 0.0085, offsetLng: 0.0090, openLate: false },
-    { name: 'Windmill Shopping InPost 24/7 Locker', street: 'Windmill Lane', town: 'Smethwick', postcode: 'B66 3PR', courier: 'InPost', offsetLat: 0.0018, offsetLng: -0.0022, openLate: true },
     { name: 'Bearwood High St Convenience', street: '582 Bearwood Road', town: 'Smethwick', postcode: 'B66 4BW', courier: 'DPD', offsetLat: -0.0065, offsetLng: -0.0015, openLate: true },
-    { name: 'New Square 24/7 Locker Station', street: 'Reform Street', town: 'West Bromwich', postcode: 'B70 7PP', courier: 'InPost', offsetLat: 0.0150, offsetLng: -0.0120, openLate: true },
     { name: 'Smethwick Galton Bridge UPS Hub', street: 'Oldbury Road', town: 'Smethwick', postcode: 'B66 1JA', courier: 'UPS', offsetLat: 0.0055, offsetLng: -0.0075, openLate: false },
+    { name: 'High Street Yodel Drop & Collect', street: '89 High Street', town: 'Smethwick', postcode: 'B66 1AA', courier: 'Yodel', offsetLat: 0.0025, offsetLng: 0.0030, openLate: true },
   ],
 
   // Whittington / Oswestry (SY11)
@@ -105,7 +104,6 @@ const REGIONAL_STORES: Record<string, Array<{ name: string; street: string; town
     { name: 'Whittington Village Stores', street: 'Station Road', town: 'Whittington, Oswestry', postcode: 'SY11 4NF', courier: 'UPS', offsetLat: 0.0017, offsetLng: 0.0021, openLate: false },
     { name: 'Oswestry Central DPD Pickup Point', street: '42 High Street', town: 'Oswestry', postcode: 'SY11 1SP', courier: 'DPD', offsetLat: -0.0120, offsetLng: -0.0520, openLate: true },
     { name: 'Gobowen Road Yodel Service Point', street: '18 Gobowen Road', town: 'Oswestry', postcode: 'SY11 1HT', courier: 'Yodel', offsetLat: -0.0090, offsetLng: -0.0480, openLate: true },
-    { name: 'Oswestry Superstore 24/7 Locker', street: 'Salop Road', town: 'Oswestry', postcode: 'SY11 2RL', courier: 'InPost', offsetLat: -0.0150, offsetLng: -0.0460, openLate: true },
     { name: 'St Martins Stores & Post', street: 'Overton Road', town: 'St Martins, Oswestry', postcode: 'SY11 3AY', courier: 'UPS', offsetLat: 0.0240, offsetLng: 0.0110, openLate: false },
   ],
 
@@ -114,14 +112,13 @@ const REGIONAL_STORES: Record<string, Array<{ name: string; street: string; town
     { name: 'Infirmary Street Logistics Hub', street: '2 Infirmary Street', town: 'Leeds', postcode: 'LS1 2JP', courier: 'DPD', offsetLat: 0.0010, offsetLng: 0.0005, openLate: true },
     { name: 'Leeds City Station UPS Access Point', street: 'New Station Street', town: 'Leeds', postcode: 'LS1 4DY', courier: 'UPS', offsetLat: -0.0025, offsetLng: 0.0030, openLate: true },
     { name: 'The Headrow Yodel Collect Point', street: '88 The Headrow', town: 'Leeds', postcode: 'LS1 8EQ', courier: 'Yodel', offsetLat: 0.0035, offsetLng: -0.0015, openLate: true },
-    { name: 'Trinity Leeds InPost 24/7 Locker', street: 'Albion Street', town: 'Leeds', postcode: 'LS1 5ER', courier: 'InPost', offsetLat: 0.0015, offsetLng: 0.0040, openLate: true },
   ],
 };
 
 // Generate geographically-accurate pickup locations strictly around the customer's actual postcode
 export function generatePostcodeAccuratePickupLocations(
   customer: CustomerDetails,
-  enabledCouriers: string[] = ['DPD', 'UPS', 'Yodel', 'InPost']
+  enabledCouriers: string[] = ['DPD', 'UPS', 'Yodel']
 ): PickupLocationItem[] {
   const centroid = getCustomerCentroid(customer);
   const outward = extractOutwardCode(customer.postcode);
@@ -141,7 +138,6 @@ export function generatePostcodeAccuratePickupLocations(
         { name: `${customer.city || 'Local'} Express & News`, street: 'High Street', town: customer.city || 'Town Centre', postcode: `${outward} 1AA`, courier: 'DPD', offsetLat: 0.0040, offsetLng: -0.0030, openLate: true },
         { name: `${customer.city || 'Central'} UPS Access Point`, street: 'Station Road', town: customer.city || 'Town Centre', postcode: `${outward} 2BB`, courier: 'UPS', offsetLat: -0.0030, offsetLng: 0.0040, openLate: false },
         { name: `${customer.city || 'Community'} Yodel Collect`, street: 'Church Street', town: customer.city || 'Town Centre', postcode: `${outward} 3CC`, courier: 'Yodel', offsetLat: 0.0060, offsetLng: 0.0050, openLate: true },
-        { name: `${customer.city || 'Retail'} InPost 24/7 Locker`, street: 'Shopping Centre', town: customer.city || 'Town Centre', postcode: `${outward} 4DD`, courier: 'InPost', offsetLat: -0.0050, offsetLng: -0.0040, openLate: true },
       ];
     }
   }

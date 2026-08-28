@@ -11,6 +11,7 @@ export const DropShopSettings: React.FC = () => {
   }, [settings]);
 
   const dropShop = settings.dropShop;
+  const enabledCouriers = settings.couriers.filter((c) => c.enabled);
 
   const handleUpdate = (field: string, value: any) => {
     settings.updateDropShop({ [field]: value });
@@ -24,13 +25,10 @@ export const DropShopSettings: React.FC = () => {
     settings.updateDropShop({ enabledCouriers: updated });
   };
 
-  const availableNetworks = [
-    { key: 'DPD', name: 'DPD Pickup Network (10,000+ Stores)' },
-    { key: 'UPS', name: 'UPS Access Point Network' },
-    { key: 'Yodel', name: 'Yodel Store / Collect Point' },
-    { key: 'InPost', name: 'InPost 24/7 Automated Lockers' },
-    { key: 'Evri', name: 'Evri ParcelShop & Lockers' },
-  ];
+  const availableNetworks = enabledCouriers.map((c) => ({
+    key: c.key,
+    name: `${c.name} Pickup / Access Point Network`,
+  }));
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-6">
