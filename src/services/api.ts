@@ -45,7 +45,6 @@ export async function getMoovParcelPresets(
   const headers: Record<string, string> = {
     'api-user': credentials.voilaApiUser || '',
     'api-token': credentials.voilaApiToken || '',
-    'api-key': credentials.voilaApiToken || '',
   };
 
   try {
@@ -128,7 +127,6 @@ export async function getCourierPresets(
   const headers: Record<string, string> = {
     'api-user': credentials.voilaApiUser,
     'api-token': credentials.voilaApiToken,
-    'api-key': credentials.voilaApiToken,
   };
 
   if (!credentials.useLiveApi) {

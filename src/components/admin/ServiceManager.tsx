@@ -126,7 +126,6 @@ export const ServiceManager: React.FC = () => {
     const headersSent = {
       'api-user': apiUser.trim(),
       'api-token': apiToken.trim() ? `${apiToken.trim().substring(0, 4)}...${apiToken.trim().slice(-4)}` : '(empty)',
-      'api-key': apiToken.trim() ? `${apiToken.trim().substring(0, 4)}...${apiToken.trim().slice(-4)}` : '(empty)',
     };
 
     // Save auth headers if user changed them
@@ -331,13 +330,13 @@ export const ServiceManager: React.FC = () => {
 
           <div className="sm:col-span-5">
             <label className="block text-xs font-semibold text-gray-700 mb-1">
-              Header: <code className="text-sky-700 font-mono">api-token / api-key</code>
+              Header: <code className="text-sky-700 font-mono">api-token</code>
             </label>
             <input
               type="password"
               value={apiToken}
               onChange={(e) => setApiToken(e.target.value)}
-              placeholder="Enter Voila API token / key"
+              placeholder="Enter Voila api-token"
               className="w-full px-3 py-2 bg-gray-50/70 border border-gray-300 rounded-xl text-xs font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
             />
           </div>

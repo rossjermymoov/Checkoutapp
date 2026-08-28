@@ -83,7 +83,7 @@ app.post('/api/proxy/credentials', (req, res) => {
 app.get('/api/proxy/presets/:courier', async (req, res) => {
   const { courier } = req.params;
   const apiUser = req.headers['api-user'];
-  const apiToken = req.headers['api-token'] || req.headers['api-key'];
+  const apiToken = req.headers['api-token'];
 
   const targetUrl = `https://app.heyvoila.io/api/couriers/v1/${encodeURIComponent(courier)}/presets`;
   console.log(`[PROXY -> HeyVoila] Fetching presets for courier "${courier}" at ${targetUrl}`);
@@ -93,9 +93,6 @@ app.get('/api/proxy/presets/:courier', async (req, res) => {
     headers: {
       'api-user': apiUser || '',
       'api-token': apiToken || '',
-      'api-key': apiToken || '',
-      'API user': apiUser || '',
-      'API token': apiToken || '',
       'Content-Type': 'application/json',
     },
   });
