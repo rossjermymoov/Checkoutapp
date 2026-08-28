@@ -347,8 +347,12 @@ export class CheckoutStore {
             serviceId: quoted.code,
             serviceName: override?.displayName || meta?.name || quoted.name,
             courier,
-            // Transit time comes from Voila, not from a hardcoded string.
-            leadTime: meta?.leadTime.label || 'Delivery time confirmed at dispatch',
+            // Transit time comes from Voila, but the merchant's own wording wins
+            // where they have set it. Voila reports DPD Saturday and DPD Sunday
+            // as "Next Day", which is true of the transit but wrong to show a
+            // customer, and there was no way to correct it: the console had the
+            // field and this ignored it.
+            leadTime: override?.leadTime?.trim() || meta?.leadTime.label || 'Delivery time confirmed at dispatch',
             leadTimeDays: meta?.leadTime.days ?? null,
             isDropShop,
             isPremium: Boolean(override?.isPremium),

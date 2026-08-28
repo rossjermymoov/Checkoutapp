@@ -34,6 +34,19 @@ export const DeliverySelector: React.FC<DeliverySelectorProps> = ({
   const fastestDays = leadDays.length > 0 ? Math.min(...leadDays) : null;
   const cheapestPrice = rates.length > 0 ? Math.min(...rates.map((r) => r.price)) : null;
 
+  // Badges mark ONE service each. Several services usually share the quickest
+  // transit time — 21 of this account's DPD services all report "Next Day" —
+  // so badging every one of them says nothing. "Fastest" goes to the cheapest
+  // of the quickest group; when that is also the cheapest overall, the same
+  // row carries both.
+  const cheapestId = rates.length > 1 ? rates.find((r) => r.price === cheapestPrice)?.serviceId : undefined;
+  const fastestId =
+    rates.length > 1 && fastestDays != null
+      ? rates
+          .filter((r) => r.leadTimeDays === fastestDays)
+          .reduce((best, r) => (r.price < best.price ? r : best)).serviceId
+      : undefined;
+
   // Is a pickup point actually cheaper than the doorstep option in front of the
   // customer? Compared against what they have selected, or the cheapest
   // doorstep rate if nothing is selected yet. No saving, no banner.
@@ -246,12 +259,12 @@ export const DeliverySelector: React.FC<DeliverySelectorProps> = ({
                             transit time, not from guessing at service ID strings.
                             They are independent: a service that is both the
                             cheapest and the fastest earns both badges. */}
-                        {rates.length > 1 && option.price === cheapestPrice && (
+                        {option.serviceId === cheapestId && (
                           <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
                             Cheapest
                           </span>
                         )}
-                        {rates.length > 1 && option.leadTimeDays != null && option.leadTimeDays === fastestDays && (
+                        {option.serviceId === fastestId && (
                           <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 border border-sky-200">
                             Fastest
                           </span>
