@@ -185,6 +185,7 @@ export interface DominanceCandidate {
   price: number;
   leadTimeDays?: number | null;
   isDropShop?: boolean;
+  isPremium?: boolean;
 }
 
 export interface DominanceResult<T extends DominanceCandidate> {
@@ -211,7 +212,13 @@ export interface DominanceResult<T extends DominanceCandidate> {
 export function removeDominatedOptions<T extends DominanceCandidate>(options: T[]): DominanceResult<T> {
   const groupKey = (o: T) => `${normaliseCourier(o.courier).toLowerCase()}|${o.isDropShop ? 'pickup' : 'door'}`;
 
-  const dominates = (a: T, ai: number, b: T, bi: number): boolean => {
+  const dominates = (a: T, _ai: number, b: T, _bi: number): boolean => {
+    // Premium services sit outside the comparison in both directions. A
+    // Saturday service booked on a Tuesday takes five days but is not "slow" —
+    // it is sold for the day it lands on. It must never be hidden by a standard
+    // next-day service, and must never hide one either.
+    if (a.isPremium || b.isPremium) return false;
+
     const aDays = a.leadTimeDays;
     const bDays = b.leadTimeDays;
     if (aDays == null || bDays == null) return false;

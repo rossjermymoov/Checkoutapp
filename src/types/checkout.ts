@@ -38,6 +38,8 @@ export interface SelectedShippingOption {
   leadTimeDays?: number | null;
   /** Merchant-set: this service delivers to a pickup point, not a doorstep. */
   isDropShop?: boolean;
+  /** Merchant-set: sold for the day it lands on, exempt from speed comparison. */
+  isPremium?: boolean;
   price: number;
   originalPrice: number;
   dropShopDetails?: {

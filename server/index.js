@@ -191,6 +191,31 @@ app.post('/api/proxy/credentials', (req, res) => {
   }
 });
 
+/**
+ * Shared merchant configuration for a hosted demo.
+ *
+ * Service selections, pricing rules and courier settings otherwise live in the
+ * browser's localStorage, which means they exist only on the machine that
+ * created them. A visitor opening the deployed URL — or the same person in a
+ * private window — gets an unconfigured app.
+ *
+ * CHECKOUT_SETTINGS_JSON lets the host carry that configuration. Export it from
+ * the console on a configured machine and set it as an environment variable.
+ * Credentials are never part of it; those stay in their own variables.
+ */
+app.get('/api/proxy/settings', (req, res) => {
+  const raw = process.env.CHECKOUT_SETTINGS_JSON;
+  if (!raw) return res.json({ configured: false });
+  try {
+    const parsed = JSON.parse(raw);
+    delete parsed.credentials;
+    return res.json({ configured: true, settings: parsed });
+  } catch (e) {
+    console.warn('[PROXY] CHECKOUT_SETTINGS_JSON is not valid JSON, ignoring it.');
+    return res.json({ configured: false, error: 'CHECKOUT_SETTINGS_JSON is not valid JSON' });
+  }
+});
+
 // 1. Courier presets
 app.get('/api/proxy/presets/:courier', async (req, res) => {
   const creds = resolveVoilaCredentials(req);

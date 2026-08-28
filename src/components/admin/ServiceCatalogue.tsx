@@ -162,6 +162,27 @@ export const ServiceCatalogue: React.FC = () => {
         </div>
       )}
 
+      {/* Deployment configuration */}
+      <details className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <summary className="p-3 text-xs font-semibold text-gray-900 cursor-pointer select-none">
+          Share this configuration with a deployed site
+        </summary>
+        <div className="px-3 pb-3 space-y-2 text-xs text-gray-600">
+          <p>
+            Service selections and pricing rules live in this browser. A visitor opening the deployed URL, or you in a
+            private window, starts unconfigured. Copy the JSON below and set it as the{' '}
+            <code className="px-1 bg-gray-100 rounded">CHECKOUT_SETTINGS_JSON</code> environment variable on your host,
+            and every visitor gets this setup. It contains no credentials.
+          </p>
+          <textarea
+            readOnly
+            onFocus={(e) => e.currentTarget.select()}
+            value={settings.exportConfiguration()}
+            className="w-full h-28 p-2 font-mono text-[10px] bg-gray-950 text-emerald-300 rounded-lg border border-gray-800"
+          />
+        </div>
+      </details>
+
       {/* Display policy */}
       <label className="flex items-start gap-2.5 p-3 bg-white border border-gray-200 rounded-xl cursor-pointer">
         <input

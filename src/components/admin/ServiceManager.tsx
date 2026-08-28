@@ -783,6 +783,18 @@ export const ServiceManager: React.FC = () => {
                       >
                         {service.isDropShop ? 'Pickup Point' : 'Doorstep'}
                       </button>
+                      <button
+                        type="button"
+                        title="Premium services are sold for the day they land on (Saturday, Sunday, timed) and are never hidden by the speed-and-price comparison."
+                        onClick={() => handleUpdateService(service.dc_service_id, { isPremium: !service.isPremium })}
+                        className={`ml-1 px-2 py-0.5 rounded text-[11px] font-semibold border ${
+                          service.isPremium
+                            ? 'bg-amber-50 border-amber-300 text-amber-800'
+                            : 'bg-gray-100 border-gray-200 text-gray-500'
+                        }`}
+                      >
+                        {service.isPremium ? 'Premium' : 'Standard'}
+                      </button>
                     </td>
 
                     {/* Price Override */}

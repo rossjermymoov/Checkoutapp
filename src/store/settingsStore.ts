@@ -260,6 +260,43 @@ export class SettingsStore {
 
     // Sync with server disk credentials
     this.syncWithServerCredentials();
+
+    // A browser with no stored configuration adopts the host's, so a deployed
+    // demo is not blank for everyone except the person who configured it.
+    if (!parsed) this.adoptServerSettings();
+  }
+
+  private async adoptServerSettings() {
+    try {
+      const res = await fetch('/api/proxy/settings');
+      if (!res.ok) return;
+      const body = await res.json();
+      if (!body?.configured || !body.settings) return;
+
+      const s = migrateSettings(body.settings);
+      if (Array.isArray(s.services)) this.services = s.services;
+      if (Array.isArray(s.pricingRules)) this.pricingRules = s.pricingRules;
+      if (Array.isArray(s.couriers)) this.couriers = s.couriers;
+      if (s.dropShop) this.dropShop = { ...this.dropShop, ...s.dropShop };
+      if (typeof s.hideDominatedServices === 'boolean') {
+        this.hideDominatedServices = s.hideDominatedServices;
+      }
+      this.notify(true);
+    } catch (e) {
+      // Offline or not configured — the app still runs, just unconfigured.
+    }
+  }
+
+  /** Configuration as JSON for CHECKOUT_SETTINGS_JSON. Never includes secrets. */
+  public exportConfiguration(): string {
+    return JSON.stringify({
+      schemaVersion: SCHEMA_VERSION,
+      couriers: this.couriers,
+      services: this.services,
+      pricingRules: this.pricingRules,
+      dropShop: this.dropShop,
+      hideDominatedServices: this.hideDominatedServices,
+    });
   }
 
   private async syncWithServerCredentials() {

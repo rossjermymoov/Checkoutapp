@@ -30,6 +30,12 @@ export interface ConfiguredService {
   priceOverride?: number | null;
   badgeText?: string | null;
   isDropShop?: boolean;
+  /**
+   * A service sold for WHEN it delivers, not how fast. Saturday, Sunday and
+   * timed services all report lead_time "Next Day" in Voila, so speed-and-price
+   * comparison cannot tell them apart. Premium services are exempt from it.
+   */
+  isPremium?: boolean;
 }
 
 /** Where the order is going, relative to the shipping origin (GB). */

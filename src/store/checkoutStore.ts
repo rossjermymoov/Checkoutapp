@@ -351,6 +351,7 @@ export class CheckoutStore {
             leadTime: meta?.leadTime.label || 'Delivery time confirmed at dispatch',
             leadTimeDays: meta?.leadTime.days ?? null,
             isDropShop,
+            isPremium: Boolean(override?.isPremium),
             price: Number(finalRate.toFixed(2)),
             originalPrice: Number(baseRate.toFixed(2)),
           };
