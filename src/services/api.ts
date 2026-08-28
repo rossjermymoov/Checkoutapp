@@ -159,6 +159,52 @@ export function normalisePickupLocations(courier: string, data: any[]): PickupLo
     .filter((x): x is PickupLocationItem => x !== null);
 }
 
+/**
+ * UPS live negotiated rates, via the server.
+ *
+ * The browser sends the destination and the parcels and receives a service name,
+ * a total and a transit time. The OAuth credentials, the account number, the
+ * negotiated cost and the charge breakdown all stay on the server.
+ */
+export async function getUpsQuote(
+  customer: CustomerDetails,
+  parcels: Array<{ weightKg: number; quantity: number }>,
+  orderValue: number
+): Promise<{ services: QuotedService[]; transitDays: Record<string, number | null>; error?: string }> {
+  const res = await fetch('/api/proxy/ups-quote', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...tenantHeader() },
+    body: JSON.stringify({
+      shipTo: {
+        name: `${customer.firstName} ${customer.lastName}`.trim() || DEMO_ADDRESS.name,
+        address1: customer.address1 || DEMO_ADDRESS.address1,
+        city: customer.city || DEMO_ADDRESS.city,
+        postcode: customer.postcode || DEMO_ADDRESS.postcode,
+        countryIso: customer.countryIso || 'GB',
+      },
+      parcels,
+      orderValue,
+    }),
+  }).catch(() => null);
+
+  if (!res) return { services: [], transitDays: {}, error: 'Could not reach the server.' };
+
+  const { data, isJson } = await safeParseResponse(res);
+  if (!res.ok) {
+    return { services: [], transitDays: {}, error: extractError(data, res.status, 'UPS rating failed') };
+  }
+
+  const services: QuotedService[] = [];
+  const transitDays: Record<string, number | null> = {};
+  (isJson ? data.services || [] : []).forEach((s: any) => {
+    const code = `UPS-RATE-${s.serviceCode}`;
+    services.push({ code, name: s.serviceName, courier: 'UPS', price: Number(s.price) });
+    transitDays[code] = s.daysInTransit ?? null;
+  });
+
+  return { services, transitDays };
+}
+
 // 1. HeyVoila / MoovParcel API: Get Presets (GET /api/couriers/v1/MoovParcel/presets)
 export async function getMoovParcelPresets(
   credentials: ApiCredentials

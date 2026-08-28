@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
+import { getUpsRates, upsConfigured, upsConfig } from './ups.js';
 
 dotenv.config();
 
@@ -296,6 +297,7 @@ app.get('/api/proxy/health', (req, res) => {
     environment: IS_PRODUCTION ? 'production' : 'development',
     adminRequired: ADMIN_ENABLED,
     linksPersistent: LINKS_PERSISTENT,
+    ups: upsConfigured() ? { configured: true, environment: upsConfig().env } : { configured: false },
     credentials: {
       voila: Boolean(voila.apiUser && voila.apiToken),
       billing: Boolean(billing.customerKey),
@@ -540,6 +542,34 @@ app.get('/api/proxy/list-couriers', async (req, res) => {
   if (missingVoilaCredentials(res, creds)) return;
 
   await forward(res, `${VOILA_BASE}/list-couriers`, { method: 'GET', headers: voilaHeaders(creds) });
+});
+
+/**
+ * UPS live negotiated rates. Everything sensitive stays here: the OAuth secret,
+ * the account number, the negotiated cost and the charge breakdown. The browser
+ * receives a service name, a total and a transit time.
+ */
+app.post('/api/proxy/ups-quote', async (req, res) => {
+  if (!upsConfigured()) {
+    return res.status(400).json({
+      error: 'UPS is not configured.',
+      detail: 'Set UPS_CLIENT_ID, UPS_CLIENT_SECRET and UPS_ACCOUNT_NUMBER in the environment.',
+      services: [],
+    });
+  }
+
+  const { shipTo, parcels, orderValue } = req.body || {};
+  if (!shipTo?.countryIso || !Array.isArray(parcels) || parcels.length === 0) {
+    return res.status(400).json({ error: 'A destination and at least one parcel are required.', services: [] });
+  }
+
+  try {
+    const result = await getUpsRates({ shipTo, parcels, orderValue });
+    return res.json(result);
+  } catch (err) {
+    console.error('[UPS] Rating failed:', err.message);
+    return res.status(err.status || 502).json({ error: err.message, services: [] });
+  }
 });
 
 // 5. Billing API quote

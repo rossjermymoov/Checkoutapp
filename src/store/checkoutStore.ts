@@ -1,7 +1,7 @@
 import { CartProduct, CustomerDetails, SelectedShippingOption, OrderConfirmation } from '../types/checkout';
 import { PickupLocationItem, QuotedService } from '../types/api';
 import { DEFAULT_PRODUCTS, DEFAULT_CUSTOMER } from '../services/mockData';
-import { getBillingQuote, getPickupLocations } from '../services/api';
+import { getBillingQuote, getPickupLocations, getUpsQuote } from '../services/api';
 import {
   getServiceCatalogue,
   normaliseCourier,
@@ -32,6 +32,8 @@ export class CheckoutStore {
   /** Why the rate list is empty or incomplete. Surfaced instead of hidden. */
   public ratesError: string | null = null;
   public catalogueError: string | null = null;
+  /** Why UPS international rates are missing, when they are. */
+  public upsError: string | null = null;
   public ratesFromLive: boolean = false;
   /** Services excluded by a rule, with the reason, e.g. a weight limit. */
   public unavailableNotices: string[] = [];
@@ -262,9 +264,28 @@ export class CheckoutStore {
         getServiceCatalogue(settings.credentials),
       ]);
 
+      const notices: string[] = [];
+
       this.ratesFromLive = quoteRes.fromLive;
       this.ratesError = quoteRes.error || null;
       this.catalogueError = catalogueRes.error || null;
+
+      // UPS rates the international lanes the Billing API does not cover — it
+      // returns an empty list for every non-GB destination. Asked in parallel,
+      // and a UPS failure never blocks the domestic quote.
+      const isInternational = (this.customer.countryIso || 'GB').toUpperCase() !== 'GB';
+      let upsServices: QuotedService[] = [];
+      let upsTransit: Record<string, number | null> = {};
+      if (!isSandbox && isInternational) {
+        const parcels = this.cart.map((item) => ({ weightKg: item.weightKg, quantity: item.quantity }));
+        const ups = await getUpsQuote(this.customer, parcels, this.getSubtotal());
+        upsServices = ups.services;
+        upsTransit = ups.transitDays;
+        this.upsError = ups.error || null;
+        if (ups.error) notices.push(`UPS international rates unavailable: ${ups.error}`);
+      } else {
+        this.upsError = null;
+      }
 
       const catalogue = catalogueRes.catalogue;
 
@@ -285,12 +306,11 @@ export class CheckoutStore {
                 price: sandboxPrice,
               };
             })
-        : quoteRes.services;
+        : [...quoteRes.services, ...upsServices];
       // The merchant console decorates and may suppress; it no longer decides
       // what exists. Match its entries to quoted services by dc_service_id.
       const overrides = new Map(settings.services.map((s) => [s.dc_service_id, s]));
       const totalWeight = this.getTotalWeightKg();
-      const notices: string[] = [];
 
       const options: SelectedShippingOption[] = quotedServices
         .map((quoted) => {
@@ -304,11 +324,15 @@ export class CheckoutStore {
           // it in the Service Catalogue and left it enabled. The Billing API
           // quoting something is necessary but not sufficient — otherwise a new
           // route added upstream would start selling itself without review.
-          if (!override) {
+          // UPS rates come from UPS's own rating API, not the Voila catalogue,
+          // so there is no preset to have selected. They are admitted on the
+          // strength of being quoted, and still pass through pricing rules,
+          // dominance and the courier toggles below.
+          if (!override && !quoted.code.startsWith('UPS-RATE-')) {
             notices.push(`${quoted.name} was quoted but is not in your selected services`);
             return false;
           }
-          if (override.enabled === false) return false;
+          if (override && override.enabled === false) return false;
 
           // A courier the console knows about and has switched off is hidden.
           const known = settings.couriers.find((c) => c.key.toLowerCase() === courier.toLowerCase());
@@ -352,8 +376,13 @@ export class CheckoutStore {
             // as "Next Day", which is true of the transit but wrong to show a
             // customer, and there was no way to correct it: the console had the
             // field and this ignored it.
-            leadTime: override?.leadTime?.trim() || meta?.leadTime.label || 'Delivery time confirmed at dispatch',
-            leadTimeDays: meta?.leadTime.days ?? null,
+            leadTime:
+              override?.leadTime?.trim() ||
+              meta?.leadTime.label ||
+              (upsTransit[quoted.code] != null
+                ? `${upsTransit[quoted.code]} working day${upsTransit[quoted.code] === 1 ? '' : 's'}`
+                : 'Delivery time confirmed at dispatch'),
+            leadTimeDays: meta?.leadTime.days ?? upsTransit[quoted.code] ?? null,
             isDropShop,
             isPremium: Boolean(override?.isPremium),
             price: Number(finalRate.toFixed(2)),
