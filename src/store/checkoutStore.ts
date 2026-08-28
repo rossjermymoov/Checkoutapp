@@ -1,5 +1,5 @@
 import { CartProduct, CustomerDetails, SelectedShippingOption, OrderConfirmation } from '../types/checkout';
-import { PickupLocationItem } from '../types/api';
+import { PickupLocationItem, QuotedService } from '../types/api';
 import { DEFAULT_PRODUCTS, DEFAULT_CUSTOMER } from '../services/mockData';
 import { getBillingQuote, getPickupLocations } from '../services/api';
 import { getServiceCatalogue, normaliseCourier, checkWeightEligibility } from '../services/serviceCatalogue';
@@ -201,8 +201,12 @@ export class CheckoutStore {
     this.notify();
 
     try {
+      const isSandbox = !settings.credentials.useLiveApi;
+
       const [quoteRes, catalogueRes] = await Promise.all([
-        getBillingQuote(this.customer, settings.credentials, this.getTotalWeightKg()),
+        isSandbox
+          ? Promise.resolve({ services: [] as QuotedService[], quotes: {}, fromLive: false, error: undefined })
+          : getBillingQuote(this.customer, settings.credentials, this.getTotalWeightKg()),
         getServiceCatalogue(settings.credentials),
       ]);
 
@@ -211,6 +215,25 @@ export class CheckoutStore {
       this.catalogueError = catalogueRes.error || null;
 
       const catalogue = catalogueRes.catalogue;
+
+      // Sandbox mode prices the merchant's OWN chosen services rather than a
+      // fabricated list. It can therefore never surface a service code that
+      // does not exist upstream, which is what made mock mode so misleading.
+      const quotedServices: QuotedService[] = isSandbox
+        ? settings.services
+            .filter((s) => s.enabled)
+            .map((s) => {
+              const meta = catalogue.get(s.dc_service_id);
+              const days = meta?.leadTime.days;
+              const sandboxPrice = days === 0 ? 9.95 : days === 1 ? 5.95 : days === 2 ? 4.95 : days === 3 ? 3.95 : 4.5;
+              return {
+                code: s.dc_service_id,
+                name: meta?.name || s.originalName || s.dc_service_id,
+                courier: meta?.courier || s.courier,
+                price: sandboxPrice,
+              };
+            })
+        : quoteRes.services;
       const subtotal = this.getSubtotal();
       const isFreeThresholdMet =
         settings.pricing.freeShippingThreshold !== null && subtotal >= settings.pricing.freeShippingThreshold;
@@ -221,7 +244,7 @@ export class CheckoutStore {
       const totalWeight = this.getTotalWeightKg();
       const notices: string[] = [];
 
-      const options: SelectedShippingOption[] = quoteRes.services
+      const options: SelectedShippingOption[] = quotedServices
         .map((quoted) => {
           const meta = catalogue.get(quoted.code);
           const override = overrides.get(quoted.code);
@@ -229,12 +252,17 @@ export class CheckoutStore {
           return { quoted, meta, override, courier };
         })
         .filter(({ quoted, meta, override, courier }) => {
-          // Explicit suppression in the console wins.
-          if (override && override.enabled === false) return false;
+          // STRICT ALLOW-LIST. A service sells only if the merchant has chosen
+          // it in the Service Catalogue and left it enabled. The Billing API
+          // quoting something is necessary but not sufficient — otherwise a new
+          // route added upstream would start selling itself without review.
+          if (!override) {
+            notices.push(`${quoted.name} was quoted but is not in your selected services`);
+            return false;
+          }
+          if (override.enabled === false) return false;
 
           // A courier the console knows about and has switched off is hidden.
-          // A courier it has never heard of passes through — the Billing API
-          // quoted it, so it is sellable.
           const known = settings.couriers.find((c) => c.key.toLowerCase() === courier.toLowerCase());
           if (known && !known.enabled) return false;
 

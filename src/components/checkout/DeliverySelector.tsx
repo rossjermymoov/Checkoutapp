@@ -150,13 +150,25 @@ export const DeliverySelector: React.FC<DeliverySelectorProps> = ({
         <div className="p-6 bg-amber-50 border border-amber-200 rounded-xl flex items-start space-x-3 text-amber-800 text-xs">
           <AlertCircle className="w-5 h-5 flex-shrink-0 text-amber-600" />
           <div>
-            <p className="font-semibold text-amber-900">
-              No services available to {checkout.customer.postcode || 'this postcode'}
-            </p>
-            <p className="mt-1">
-              The carrier account returned no priced services for this address. Check the postcode, or review enabled
-              carriers in <strong>Carrier Settings</strong>.
-            </p>
+            {settings.services.length === 0 ? (
+              <>
+                <p className="font-semibold text-amber-900">No services selected yet</p>
+                <p className="mt-1">
+                  Open <strong>Settings → Service Catalogue</strong> and tick the services you sell. Only selected
+                  services can appear here.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="font-semibold text-amber-900">
+                  None of your selected services deliver to {checkout.customer.postcode || 'this postcode'}
+                </p>
+                <p className="mt-1">
+                  The carrier account returned no priced services for this address — services with postcode
+                  restrictions are excluded automatically by the carrier.
+                </p>
+              </>
+            )}
           </div>
         </div>
       )}

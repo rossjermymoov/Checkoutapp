@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Sliders, Key, PackageCheck, DollarSign, MapPin, Terminal, RotateCcw, Check, Sparkles, Server } from 'lucide-react';
+import { Sliders, Key, PackageCheck, DollarSign, MapPin, Terminal, RotateCcw, Check, Sparkles, Server, Layers } from 'lucide-react';
 import { SettingsStore } from '../store/settingsStore';
 import { CredentialsSettings } from '../components/admin/CredentialsSettings';
 import { ServiceManager } from '../components/admin/ServiceManager';
+import { ServiceCatalogue } from '../components/admin/ServiceCatalogue';
 import { PricingRules } from '../components/admin/PricingRules';
 import { DropShopSettings } from '../components/admin/DropShopSettings';
 import { ApiInspector } from '../components/admin/ApiInspector';
@@ -11,7 +12,7 @@ import { CourierConfig, ConfiguredService } from '../types/settings';
 export const SettingsPage: React.FC = () => {
   const settings = SettingsStore.getInstance();
   const [, setTick] = useState(0);
-  const [activeSubTab, setActiveSubTab] = useState<'credentials' | 'services' | 'pricing' | 'dropshop' | 'inspector'>('credentials');
+  const [activeSubTab, setActiveSubTab] = useState<'credentials' | 'catalogue' | 'services' | 'pricing' | 'dropshop' | 'inspector'>('credentials');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   React.useEffect(() => {
@@ -78,6 +79,18 @@ export const SettingsPage: React.FC = () => {
           >
             <Key className="w-3.5 h-3.5" />
             <span>API Credentials & Endpoints</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('catalogue')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2 whitespace-nowrap ${
+              activeSubTab === 'catalogue'
+                ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20'
+                : 'bg-white hover:bg-gray-100 text-gray-700 border border-gray-200'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>Service Catalogue</span>
           </button>
 
           <button
@@ -167,6 +180,7 @@ export const SettingsPage: React.FC = () => {
       {/* Sub-Tab Panels */}
       <div className="pt-2">
         {activeSubTab === 'credentials' && <CredentialsSettings />}
+        {activeSubTab === 'catalogue' && <ServiceCatalogue />}
         {activeSubTab === 'services' && <ServiceManager />}
         {activeSubTab === 'pricing' && <PricingRules />}
         {activeSubTab === 'dropshop' && <DropShopSettings />}

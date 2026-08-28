@@ -1,7 +1,6 @@
 import { ApiCredentials } from '../types/settings';
 import { VoilaPreset, PickupLocationItem, ApiLogEntry, QuotedService } from '../types/api';
 import { CustomerDetails } from '../types/checkout';
-import { MOCK_PRESETS_BY_COURIER, MOCK_BILLING_QUOTES } from './mockData';
 import { generatePostcodeAccuratePickupLocations } from './geoService';
 
 // Neutral fallback address used when the customer form is empty. Deliberately not
@@ -231,22 +230,9 @@ export async function getCourierPresets(
     'api-token': credentials.voilaApiToken,
   };
 
-  if (!credentials.useLiveApi) {
-    const mockList = MOCK_PRESETS_BY_COURIER[courier] || [];
-    emitLog({
-      id: Math.random().toString(36).substring(7),
-      timestamp: new Date().toLocaleTimeString(),
-      endpoint: `https://app.heyvoila.io/api/couriers/v1/${courier}/presets`,
-      method: 'GET',
-      headers,
-      responseStatus: 200,
-      responseBody: mockList,
-      durationMs: 45,
-      success: true,
-      source: 'mock'
-    });
-    return { presets: mockList, fromLive: false };
-  }
+  // Sandbox mode still reads the real catalogue: knowing which services exist
+  // is not the same as quoting them, and inventing service codes here is what
+  // made the console look configured when it was not.
 
   try {
     const res = await fetch(endpoint, {
@@ -273,9 +259,9 @@ export async function getCourierPresets(
     const presetList = extractPresets(data);
 
     if (!res.ok || presetList.length === 0) {
-      console.warn(`[API] Live presets failed for ${courier}, falling back to mock presets:`, data);
+      console.warn(`[API] Live presets failed for ${courier}:`, data);
       return {
-        presets: MOCK_PRESETS_BY_COURIER[courier] || [],
+        presets: [],
         fromLive: false,
         error: extractError(data, res.status, `Failed to fetch presets for ${courier}`)
       };
@@ -296,7 +282,7 @@ export async function getCourierPresets(
       success: false,
       source: 'live'
     });
-    return { presets: MOCK_PRESETS_BY_COURIER[courier] || [], fromLive: false, error: err.message };
+    return { presets: [], fromLive: false, error: err.message };
   }
 }
 
@@ -376,10 +362,9 @@ export async function getPickupLocations(
     });
 
     if (!res.ok || !Array.isArray(data)) {
-      console.warn(`[API] Live pickup locations failed for ${courier}, returning generated locations:`, data);
-      const fallbackLocations = generatePostcodeAccuratePickupLocations(customer, [courier]);
+      console.warn(`[API] Live pickup locations failed for ${courier}:`, data);
       return {
-        locations: fallbackLocations,
+        locations: [],
         fromLive: false,
         error: extractError(data, res.status, `Failed to fetch pickup locations for ${courier}`)
       };
@@ -388,9 +373,9 @@ export async function getPickupLocations(
     // Each courier returns a different record shape; normalise before use.
     const normalised = normalisePickupLocations(courier, data);
 
-    if (normalised.length === 0) {
+    if (normalised.length === 0 && data.length > 0) {
       return {
-        locations: generatePostcodeAccuratePickupLocations(customer, [courier]),
+        locations: [],
         fromLive: false,
         error: `${courier} returned ${data.length} locations in an unrecognised format.`
       };
@@ -412,8 +397,7 @@ export async function getPickupLocations(
       success: false,
       source: 'live'
     });
-    const fallbackLocations = generatePostcodeAccuratePickupLocations(customer, [courier]);
-    return { locations: fallbackLocations, fromLive: false, error: err.message };
+    return { locations: [], fromLive: false, error: err.message };
   }
 }
 
@@ -512,31 +496,9 @@ export async function getBillingQuote(
     }
   };
 
-  if (!credentials.useLiveApi) {
-    emitLog({
-      id: Math.random().toString(36).substring(7),
-      timestamp: new Date().toLocaleTimeString(),
-      endpoint: credentials.billingEndpointUrl || 'https://production.billingapi.co.uk/api/customer-routes/get-quote',
-      method: 'POST',
-      headers,
-      requestBody: body,
-      responseStatus: 200,
-      responseBody: MOCK_BILLING_QUOTES,
-      durationMs: 95,
-      success: true,
-      source: 'mock'
-    });
-    return {
-      services: Object.entries(MOCK_BILLING_QUOTES).map(([code, price]) => ({
-        code,
-        name: code,
-        courier: '',
-        price: price as number,
-      })),
-      quotes: MOCK_BILLING_QUOTES,
-      fromLive: false,
-    };
-  }
+  // No fabricated quote branch: sandbox pricing is derived from the merchant's
+  // real chosen services (see CheckoutStore.calculateRates), so a service code
+  // that does not exist upstream can never appear in the cart.
 
   try {
     const res = await fetch(endpoint, {

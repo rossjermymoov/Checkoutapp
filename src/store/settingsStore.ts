@@ -3,83 +3,22 @@ import { ApiLogEntry } from '../types/api';
 import { INITIAL_COURIERS } from '../services/mockData';
 import { setApiLogListener } from '../services/api';
 
-const STORAGE_KEY = 'checkout_demo_settings_v3';
+// v4: the fictional default services (UPS-STANDARD, DPD-NEXT-DAY,
+// DPD-PICKUP, UPS-ACCESS-POINT) were removed. Bumping the key stops them
+// being resurrected from a browser that still holds the old list.
+const STORAGE_KEY = 'checkout_demo_settings_v4';
 const PERMANENT_CREDENTIALS_KEY = 'checkout_demo_credentials_permanent';
 
-const INITIAL_SERVICES: ConfiguredService[] = [
-  {
-    dc_service_id: "DPD12-DROP",
-    courier: "DPD",
-    originalName: "DPD Drop Off Next Day",
-    displayName: "DPD Drop Off Next Day",
-    leadTime: "Next Working Day (1-hr window)",
-    enabled: true,
-    priority: 1,
-    isDropShop: false,
-    badgeText: "Fastest",
-    priceOverride: null,
-  },
-  {
-    dc_service_id: "YODC2C",
-    courier: "Yodel",
-    originalName: "Yodel C2C",
-    displayName: "Yodel C2C Tracked Delivery",
-    leadTime: "2-3 Working Days",
-    enabled: true,
-    priority: 2,
-    isDropShop: false,
-    badgeText: "Popular",
-    priceOverride: null,
-  },
-  {
-    dc_service_id: "UPS-STANDARD",
-    courier: "UPS",
-    originalName: "UPS Standard Ground",
-    displayName: "UPS Standard Delivery",
-    leadTime: "1-2 Business Days",
-    enabled: true,
-    priority: 3,
-    isDropShop: false,
-    badgeText: null,
-    priceOverride: null,
-  },
-  {
-    dc_service_id: "DPD-NEXT-DAY",
-    courier: "DPD",
-    originalName: "DPD Next Day Standard",
-    displayName: "DPD Next Day Door-to-Door",
-    leadTime: "Next Working Day",
-    enabled: true,
-    priority: 4,
-    isDropShop: false,
-    badgeText: null,
-    priceOverride: null,
-  },
-  {
-    dc_service_id: "DPD-PICKUP",
-    courier: "DPD",
-    originalName: "DPD Pickup ParcelShop Collect",
-    displayName: "DPD Local ParcelShop Collection",
-    leadTime: "Next Day to Local Store",
-    enabled: true,
-    priority: 5,
-    isDropShop: true,
-    badgeText: "Eco-Friendly",
-    priceOverride: null,
-  },
-  {
-    dc_service_id: "UPS-ACCESS-POINT",
-    courier: "UPS",
-    originalName: "UPS Access Point Economy Collect",
-    displayName: "UPS Access Point Collection",
-    leadTime: "Next Day to Access Point",
-    enabled: true,
-    priority: 6,
-    isDropShop: true,
-    badgeText: null,
-    priceOverride: null,
-  }
-];
+/**
+ * Deliberately empty. Services are chosen by the merchant from the live Voila
+ * catalogue (Settings -> Service Catalogue), never invented here.
+ *
+ * The previous defaults listed six services of which four — UPS-STANDARD,
+ * DPD-NEXT-DAY, DPD-PICKUP and UPS-ACCESS-POINT — did not exist in any real
+ * account. They could never be quoted or shipped, and made the console look
+ * configured when it was not.
+ */
+const INITIAL_SERVICES: ConfiguredService[] = [];
 
 export const DEFAULT_CREDENTIALS: ApiCredentials = {
   voilaApiUser: '',

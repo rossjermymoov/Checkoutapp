@@ -1,4 +1,3 @@
-import { VoilaPreset, PickupLocationItem, BillingQuoteItem, CourierInfo } from '../types/api';
 import { CartProduct, CustomerDetails } from '../types/checkout';
 import { OriginWarehouseAddress, CourierConfig } from '../types/settings';
 
@@ -103,112 +102,15 @@ export const INITIAL_COURIERS: CourierConfig[] = [
   }
 ];
 
-export const MOCK_PRESETS_BY_COURIER: Record<string, VoilaPreset[]> = {
-  DPD: [
-    {
-      id: 3998,
-      dc_service_id: "DPD12-DROP",
-      api_user_id: 1,
-      courier: "DPD",
-      name: "DPD Drop Off Next Day",
-      lead_time: "Next Working Day (1-hr window)",
-      rule_supported_countries: "GB"
-    },
-    {
-      id: 3999,
-      dc_service_id: "DPD-NEXT-DAY",
-      api_user_id: 1,
-      courier: "DPD",
-      name: "DPD Next Day Standard",
-      lead_time: "Next Day Delivery",
-      rule_supported_countries: "GB"
-    },
-    {
-      id: 4001,
-      dc_service_id: "DPD-12PM",
-      api_user_id: 1,
-      courier: "DPD",
-      name: "DPD Express Priority by 12PM",
-      lead_time: "Next Day before 12:00",
-      rule_supported_countries: "GB"
-    },
-    {
-      id: 4002,
-      dc_service_id: "DPD-PICKUP",
-      api_user_id: 1,
-      courier: "DPD",
-      name: "DPD Pickup ParcelShop Collect",
-      lead_time: "Next Day to Local ParcelShop",
-      rule_supported_countries: "GB"
-    }
-  ],
-  UPS: [
-    {
-      id: 6001,
-      dc_service_id: "UPS-STANDARD",
-      api_user_id: 1,
-      courier: "UPS",
-      name: "UPS Standard Ground",
-      lead_time: "1-2 Business Days",
-      rule_supported_countries: "GB"
-    },
-    {
-      id: 6002,
-      dc_service_id: "UPS-EXPRESS-SAVER",
-      api_user_id: 1,
-      courier: "UPS",
-      name: "UPS Express Saver",
-      lead_time: "Next Day by End of Day",
-      rule_supported_countries: "GB"
-    },
-    {
-      id: 6003,
-      dc_service_id: "UPS-ACCESS-POINT",
-      api_user_id: 1,
-      courier: "UPS",
-      name: "UPS Access Point Economy Collect",
-      lead_time: "Next Day to Access Point",
-      rule_supported_countries: "GB"
-    }
-  ],
-  Yodel: [
-    {
-      id: 4501,
-      dc_service_id: "YODC2C",
-      api_user_id: 1,
-      courier: "Yodel",
-      name: "Yodel C2C Delivery",
-      lead_time: "2-3 Working Days Tracked",
-      rule_supported_countries: "GB"
-    },
-    {
-      id: 4502,
-      dc_service_id: "YODEL-DIRECT",
-      api_user_id: 1,
-      courier: "Yodel",
-      name: "Yodel Direct Next Day",
-      lead_time: "Next Working Day",
-      rule_supported_countries: "GB"
-    },
-    {
-      id: 4503,
-      dc_service_id: "YODEL-STORE",
-      api_user_id: 1,
-      courier: "Yodel",
-      name: "Yodel Store Collect Point",
-      lead_time: "2 Working Days to Store",
-      rule_supported_countries: "GB"
-    }
-  ]
-};
-
-export const MOCK_BILLING_QUOTES: Record<string, number> = {
-  "DPD12-DROP": 5.00,
-  "YODC2C": 5.00,
-  "DPD-NEXT-DAY": 4.95,
-  "DPD-12PM": 7.50,
-  "DPD-PICKUP": 3.49,
-  "UPS-STANDARD": 4.49,
-  "UPS-EXPRESS-SAVER": 6.95,
-  "UPS-ACCESS-POINT": 3.20,
-};
+/*
+ * Removed: MOCK_PRESETS_BY_COURIER and MOCK_BILLING_QUOTES.
+ *
+ * They defined service codes — UPS-STANDARD, DPD-NEXT-DAY, DPD-PICKUP,
+ * UPS-ACCESS-POINT, DPD-12PM, UPS-EXPRESS-SAVER — that exist in no real Voila
+ * account. They seeded the merchant console's defaults and stood in whenever a
+ * live call failed, so the app looked configured and healthy while offering
+ * services that could never be quoted or shipped.
+ *
+ * Sandbox mode now prices the merchant's own selected services instead, so a
+ * fabricated service code cannot reach the cart. Do not reintroduce these.
+ */
