@@ -138,7 +138,20 @@ export class CheckoutStore {
   public getDropShopServiceForCourier(courier?: string): SelectedShippingOption | null {
     const key = normaliseCourier(courier).toLowerCase();
     if (!key) return null;
-    return this.dropShopRates.find((r) => normaliseCourier(r.courier).toLowerCase() === key) || null;
+
+    // Cheapest, not first-found. A courier can have several pickup-point
+    // services quoted at once — DPD Drop Off Next Day and DPD Drop Off Two Day,
+    // for instance. Taking the first in array order would let the "pay as
+    // little as £X" banner advertise one price while selection charged another.
+    const matches = this.dropShopRates.filter((r) => normaliseCourier(r.courier).toLowerCase() === key);
+    if (matches.length === 0) return null;
+    return matches.reduce((cheapest, r) => (r.price < cheapest.price ? r : cheapest));
+  }
+
+  /** The cheapest quoted pickup-point service across all couriers. */
+  public getCheapestDropShopService(): SelectedShippingOption | null {
+    if (this.dropShopRates.length === 0) return null;
+    return this.dropShopRates.reduce((cheapest, r) => (r.price < cheapest.price ? r : cheapest));
   }
 
   public selectPickupLocation(location: PickupLocationItem) {

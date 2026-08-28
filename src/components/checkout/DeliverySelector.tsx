@@ -37,14 +37,18 @@ export const DeliverySelector: React.FC<DeliverySelectorProps> = ({
   // customer? Compared against what they have selected, or the cheapest
   // doorstep rate if nothing is selected yet. No saving, no banner.
   const pickupSaving = (() => {
-    const pickups = checkout.dropShopRates;
-    if (pickups.length === 0 || rates.length === 0) return null;
-    const cheapestPickup = Math.min(...pickups.map((r) => r.price));
+    // Both sides of this comparison come from the SAME get-quote call: the
+    // Billing API returns every service it will carry, and calculateRates splits
+    // that one response into doorstep and pickup-point lists. No extra request,
+    // and the pickup figure is a live carrier price with the merchant's rules
+    // already applied — not an estimate.
+    const cheapestPickup = checkout.getCheapestDropShopService();
+    if (!cheapestPickup || rates.length === 0) return null;
     const compareAgainst = selected && !selected.isDropShop ? selected.price : cheapestPrice;
     if (compareAgainst == null) return null;
-    const saving = Number((compareAgainst - cheapestPickup).toFixed(2));
+    const saving = Number((compareAgainst - cheapestPickup.price).toFixed(2));
     if (saving <= 0) return null;
-    return { cheapest: cheapestPickup, saving };
+    return { service: cheapestPickup, saving };
   })();
 
   const getCourierLogo = (courierName: string) => {
@@ -166,12 +170,14 @@ export const DeliverySelector: React.FC<DeliverySelectorProps> = ({
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-emerald-900">
-                Collect from a local shop or locker and pay {pickupSaving.cheapest === 0 ? 'nothing' : `as little as £${pickupSaving.cheapest.toFixed(2)}`}
+                Collect from a local shop or locker and pay{' '}
+                {pickupSaving.service.price === 0 ? 'nothing' : `as little as £${pickupSaving.service.price.toFixed(2)}`}
               </p>
               <p className="text-xs text-emerald-800 mt-0.5">
-                That's <strong>£{pickupSaving.saving.toFixed(2)} less</strong> than your current choice. Collection
-                points group deliveries onto fewer trips and avoid repeat visits when you're out, so they cut the miles
-                driven per parcel.
+                That's <strong>£{pickupSaving.saving.toFixed(2)} less</strong> than your current choice, with{' '}
+                {pickupSaving.service.serviceName} ({pickupSaving.service.leadTime.toLowerCase()}). Collection points
+                group deliveries onto fewer trips and avoid repeat visits when you're out, so they cut the miles driven
+                per parcel.
               </p>
               <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 mt-2 group-hover:gap-2 transition-all">
                 Choose a collection point
