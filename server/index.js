@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -41,6 +42,79 @@ app.use((req, res, next) => {
   }
   next();
 });
+
+// ---------------------------------------------------------------------------
+// Admin gate
+// ---------------------------------------------------------------------------
+// ADMIN_PASSWORD protects the console and the link store. It is a shared
+// password for a demonstrator, not a user system: there are no accounts, no
+// reset flow and no lockout. It stops a customer who has a demo link from
+// wandering into the carrier settings; it is not protection against someone
+// determined. With no ADMIN_PASSWORD set the console stays open, and the server
+// says so at startup.
+
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+const ADMIN_ENABLED = ADMIN_PASSWORD.length > 0;
+
+function isAdmin(req) {
+  if (!ADMIN_ENABLED) return true;
+  const supplied = String(req.headers['x-admin-key'] || '');
+  if (supplied.length !== ADMIN_PASSWORD.length) return false;
+  // Constant-time compare so the response time cannot be used to guess it.
+  return crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(ADMIN_PASSWORD));
+}
+
+function requireAdmin(req, res) {
+  if (isAdmin(req)) return false;
+  res.status(401).json({ error: 'Not authorised.' });
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Customer link store
+// ---------------------------------------------------------------------------
+// Links are random tokens, created from the console and saved here so they can
+// be listed and revoked later.
+//
+// PERSISTENCE. LINKS_FILE decides where they live. On a host with an ephemeral
+// filesystem — Railway without a volume, most container platforms — a file in
+// the container is wiped on every redeploy, taking the links with it. Attach a
+// volume and point LINKS_FILE at it.
+
+const LINKS_FILE = process.env.LINKS_FILE
+  ? path.resolve(process.env.LINKS_FILE)
+  : path.join(ROOT, '.customer-links.json');
+
+const LINKS_PERSISTENT = Boolean(process.env.LINKS_FILE);
+
+function readLinks() {
+  try {
+    if (!fs.existsSync(LINKS_FILE)) return {};
+    const parsed = JSON.parse(fs.readFileSync(LINKS_FILE, 'utf8'));
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (e) {
+    console.warn('[LINKS] Could not read link store:', e.message);
+    return {};
+  }
+}
+
+function writeLinks(links) {
+  try {
+    fs.mkdirSync(path.dirname(LINKS_FILE), { recursive: true });
+    fs.writeFileSync(LINKS_FILE, JSON.stringify(links, null, 2), 'utf8');
+    return true;
+  } catch (e) {
+    console.error('[LINKS] Could not write link store:', e.message);
+    return false;
+  }
+}
+
+/** 20 characters of a-z0-9 — about 103 bits, not guessable or enumerable. */
+function newToken() {
+  const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  const bytes = crypto.randomBytes(20);
+  return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('');
+}
 
 // ---------------------------------------------------------------------------
 // Tenants (per-customer demo links)
@@ -204,6 +278,8 @@ app.get('/api/proxy/health', (req, res) => {
     status: 'ok',
     timestamp: new Date().toISOString(),
     environment: IS_PRODUCTION ? 'production' : 'development',
+    adminRequired: ADMIN_ENABLED,
+    linksPersistent: LINKS_PERSISTENT,
     credentials: {
       voila: Boolean(voila.apiUser && voila.apiToken),
       billing: Boolean(billing.customerKey),
@@ -272,11 +348,15 @@ app.get('/api/proxy/settings', (req, res) => {
 
 app.get('/api/proxy/tenants/:slug', (req, res) => {
   const slug = String(req.params.slug || '').toLowerCase();
-  if (!/^[a-z0-9-]{1,40}$/.test(slug)) return res.status(400).json({ found: false });
+  if (!/^[a-z0-9-]{1,40}$/.test(slug)) return res.status(404).json({ found: false });
 
-  // An unlisted slug is not an error. Every customer link works out of the box,
-  // with the name read off the URL and the shared configuration behind it.
-  const tenant = readTenants()[slug] || {};
+  // Only links that were actually issued resolve. A guessed or edited URL gets
+  // the same 404 as a made-up one, so customer links cannot be enumerated.
+  const saved = readLinks()[slug];
+  const configured = readTenants()[slug];
+  if (!saved && !configured) return res.status(404).json({ found: false });
+
+  const tenant = configured || {};
 
   let settings = tenant.settings;
   if (!settings) {
@@ -294,19 +374,61 @@ app.get('/api/proxy/tenants/:slug', (req, res) => {
     found: true,
     brand: {
       slug,
-      name: tenant.name || nameFromSlug(slug),
-      tagline: tenant.tagline,
+      name: tenant.name || saved?.company || nameFromSlug(slug),
+      tagline: tenant.tagline || saved?.tagline,
     },
     settings,
   });
 });
 
-/** Slugs only, so the console can list what is configured. */
-app.get('/api/proxy/tenants', (req, res) => {
-  const tenants = readTenants();
+/** Saved customer links. Admin only — this is the list of live demo URLs. */
+app.get('/api/proxy/links', (req, res) => {
+  if (requireAdmin(req, res)) return;
+  const links = readLinks();
+  const configured = Object.entries(readTenants()).map(([slug, t]) => ({
+    token: slug,
+    company: t?.name || slug,
+    createdAt: null,
+    fromEnvironment: true,
+  }));
   res.json({
-    tenants: Object.entries(tenants).map(([slug, t]) => ({ slug, name: t?.name || slug })),
+    persistent: LINKS_PERSISTENT,
+    links: [
+      ...Object.entries(links)
+        .map(([token, l]) => ({ token, company: l.company, createdAt: l.createdAt, fromEnvironment: false }))
+        .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))),
+      ...configured,
+    ],
   });
+});
+
+app.post('/api/proxy/links', (req, res) => {
+  if (requireAdmin(req, res)) return;
+  const company = String(req.body?.company || '').trim();
+  if (!company) return res.status(400).json({ error: 'A company name is required.' });
+
+  const links = readLinks();
+  const token = newToken();
+  links[token] = { company, createdAt: new Date().toISOString() };
+
+  if (!writeLinks(links)) {
+    return res.status(500).json({ error: 'Could not save the link. Check the LINKS_FILE location is writable.' });
+  }
+  res.json({ token, company, persistent: LINKS_PERSISTENT });
+});
+
+app.delete('/api/proxy/links/:token', (req, res) => {
+  if (requireAdmin(req, res)) return;
+  const token = String(req.params.token || '').toLowerCase();
+  const links = readLinks();
+  if (!links[token]) return res.status(404).json({ error: 'No such link.' });
+  delete links[token];
+  if (!writeLinks(links)) return res.status(500).json({ error: 'Could not update the link store.' });
+  res.json({ revoked: token });
+});
+
+app.post('/api/proxy/admin/check', (req, res) => {
+  res.json({ ok: isAdmin(req) });
 });
 
 // 1. Courier presets
@@ -420,4 +542,10 @@ app.listen(PORT, () => {
   console.log(`[CHECKOUT] Server listening on http://localhost:${PORT}`);
   console.log(`[CHECKOUT] Voila credentials: ${process.env.VOILA_API_USER ? 'from environment' : 'not set in environment'}`);
   console.log(`[CHECKOUT] Credential writes: ${ALLOW_CREDENTIAL_WRITES ? 'enabled' : 'disabled (server-managed)'}`);
+  console.log(`[CHECKOUT] Console: ${ADMIN_ENABLED ? 'password protected' : 'OPEN — set ADMIN_PASSWORD to protect it'}`);
+  console.log(
+    `[CHECKOUT] Customer links: ${LINKS_FILE}${
+      LINKS_PERSISTENT ? '' : ' (NOT persistent — set LINKS_FILE to a mounted volume or links are lost on redeploy)'
+    }`
+  );
 });

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Header } from './components/layout/Header';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { AdminGate } from './components/admin/AdminGate';
 import { SettingsStore } from './store/settingsStore';
 import { CheckoutStore } from './store/checkoutStore';
 import { currentTenantSlug, fetchTenant, TenantBrand } from './services/tenant';
@@ -10,6 +11,7 @@ export function App() {
   const [activeTab, setActiveTab] = useState<'checkout' | 'settings'>('checkout');
   const [brand, setBrand] = useState<TenantBrand | null>(null);
   const [loadingTenant, setLoadingTenant] = useState(!!currentTenantSlug());
+  const [notFound, setNotFound] = useState(false);
 
   // A /c/<slug> URL is a customer link: that customer's configuration, their
   // name in the header, and no route to the carrier settings.
@@ -27,6 +29,8 @@ export function App() {
         setBrand(res.brand);
         SettingsStore.getInstance().applyTenantSettings(slug, res.settings);
         CheckoutStore.getInstance().calculateRates();
+      } else {
+        setNotFound(true);
       }
       setLoadingTenant(false);
     })();
@@ -35,6 +39,19 @@ export function App() {
       cancelled = true;
     };
   }, []);
+
+  if (notFound) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f6f6f7] px-4">
+        <div className="text-center space-y-2 max-w-sm">
+          <p className="text-base font-semibold text-gray-900">This link is not available</p>
+          <p className="text-xs text-gray-500">
+            It may have been revoked, or the address may be mistyped. Ask whoever sent it for a current link.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (loadingTenant) {
     return (
@@ -61,7 +78,9 @@ export function App() {
         {activeTab === 'checkout' || isCustomerView ? (
           <CheckoutPage onOpenSettings={isCustomerView ? undefined : () => setActiveTab('settings')} />
         ) : (
-          <SettingsPage />
+          <AdminGate>
+            <SettingsPage />
+          </AdminGate>
         )}
       </main>
     </div>
