@@ -109,18 +109,22 @@ function apiProxyPlugin(): Plugin {
             const apiToken = (req.headers['api-token'] as string) || (req.headers['api-key'] as string) || '';
 
             const targetUrl = `https://app.heyvoila.io/api/couriers/v1/${encodeURIComponent(courier)}/presets`;
-            console.log(`[VITE PROXY -> HeyVoila] GET presets for "${courier}" at ${targetUrl} (user: "${apiUser}")`);
+            console.log(`[VITE PROXY -> HeyVoila] GET presets for "${courier}" at ${targetUrl} (api-user: "${apiUser}", token: "${apiToken ? apiToken.substring(0, 4) + '...' : ''}")`);
 
             const upstreamRes = await fetch(targetUrl, {
               method: 'GET',
               headers: {
                 'api-user': apiUser,
                 'api-token': apiToken,
+                'Accept': 'application/json',
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
                 'Content-Type': 'application/json',
               },
             });
 
             const text = await upstreamRes.text();
+            console.log(`[VITE PROXY -> HeyVoila Response] Status: ${upstreamRes.status}, Content-Type: ${upstreamRes.headers.get('content-type')}, Body:`, text.substring(0, 300));
+
             let parsedData: any;
             try {
               parsedData = JSON.parse(text);
@@ -151,6 +155,8 @@ function apiProxyPlugin(): Plugin {
               headers: {
                 'api-user': apiUser,
                 'api-token': apiToken,
+                'Accept': 'application/json',
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify(body),

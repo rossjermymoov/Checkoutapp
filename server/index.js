@@ -93,6 +93,8 @@ app.get('/api/proxy/presets/:courier', async (req, res) => {
     headers: {
       'api-user': apiUser || '',
       'api-token': apiToken || '',
+      'Accept': 'application/json',
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
       'Content-Type': 'application/json',
     },
   });
@@ -112,6 +114,8 @@ app.post('/api/proxy/pickup-locations/:courier', async (req, res) => {
     headers: {
       'api-user': apiUser || '',
       'api-token': apiToken || '',
+      'Accept': 'application/json',
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(req.body),
