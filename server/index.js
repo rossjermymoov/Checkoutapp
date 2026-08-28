@@ -87,6 +87,22 @@ const LINKS_FILE = process.env.LINKS_FILE
 
 const LINKS_PERSISTENT = Boolean(process.env.LINKS_FILE);
 
+// Published configuration lives beside the links, so one volume covers both.
+const SETTINGS_FILE = process.env.SETTINGS_FILE
+  ? path.resolve(process.env.SETTINGS_FILE)
+  : path.join(path.dirname(LINKS_FILE), '.published-settings.json');
+
+function readPublishedSettings() {
+  try {
+    if (!fs.existsSync(SETTINGS_FILE)) return null;
+    const parsed = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch (e) {
+    console.warn('[SETTINGS] Could not read published settings:', e.message);
+    return null;
+  }
+}
+
 function readLinks() {
   try {
     if (!fs.existsSync(LINKS_FILE)) return {};
@@ -334,16 +350,53 @@ app.post('/api/proxy/credentials', (req, res) => {
  * Credentials are never part of it; those stay in their own variables.
  */
 app.get('/api/proxy/settings', (req, res) => {
+  // Published from the console first; the environment variable is the seed for
+  // a fresh deployment and the fallback if nothing has been published yet.
+  const published = readPublishedSettings();
+  if (published) {
+    const settings = { ...published.settings };
+    delete settings.credentials;
+    return res.json({ configured: true, settings, publishedAt: published.publishedAt, source: 'published' });
+  }
+
   const raw = process.env.CHECKOUT_SETTINGS_JSON;
   if (!raw) return res.json({ configured: false });
   try {
     const parsed = JSON.parse(raw);
     delete parsed.credentials;
-    return res.json({ configured: true, settings: parsed });
+    return res.json({ configured: true, settings: parsed, source: 'environment' });
   } catch (e) {
     console.warn('[PROXY] CHECKOUT_SETTINGS_JSON is not valid JSON, ignoring it.');
     return res.json({ configured: false, error: 'CHECKOUT_SETTINGS_JSON is not valid JSON' });
   }
+});
+
+/**
+ * Publish the console's current configuration to every customer link. Replaces
+ * the export-and-paste cycle, which produced a snapshot that silently went
+ * stale the moment anything changed.
+ */
+app.post('/api/proxy/settings', (req, res) => {
+  if (requireAdmin(req, res)) return;
+
+  const settings = req.body?.settings;
+  if (!settings || typeof settings !== 'object') {
+    return res.status(400).json({ error: 'No settings supplied.' });
+  }
+  // Credentials are never part of published configuration.
+  delete settings.credentials;
+
+  const payload = { publishedAt: new Date().toISOString(), settings };
+  try {
+    fs.mkdirSync(path.dirname(SETTINGS_FILE), { recursive: true });
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(payload, null, 2), 'utf8');
+  } catch (e) {
+    console.error('[SETTINGS] Could not publish:', e.message);
+    return res.status(500).json({ error: 'Could not save. Check the SETTINGS_FILE location is writable.' });
+  }
+
+  console.log(`[SETTINGS] Published ${(settings.services || []).length} services to ${SETTINGS_FILE}`);
+  res.json({ published: true, publishedAt: payload.publishedAt, persistent: LINKS_PERSISTENT });
 });
 
 app.get('/api/proxy/tenants/:slug', (req, res) => {
@@ -358,12 +411,21 @@ app.get('/api/proxy/tenants/:slug', (req, res) => {
 
   const tenant = configured || {};
 
+  // Same precedence as GET /api/proxy/settings: a tenant's own configuration,
+  // then what the console published, then the environment seed. Reading the
+  // environment directly here would leave customer links on a stale snapshot
+  // while the root URL showed the current one.
   let settings = tenant.settings;
   if (!settings) {
-    try {
-      settings = process.env.CHECKOUT_SETTINGS_JSON ? JSON.parse(process.env.CHECKOUT_SETTINGS_JSON) : {};
-    } catch (e) {
-      settings = {};
+    const published = readPublishedSettings();
+    if (published) {
+      settings = published.settings;
+    } else {
+      try {
+        settings = process.env.CHECKOUT_SETTINGS_JSON ? JSON.parse(process.env.CHECKOUT_SETTINGS_JSON) : {};
+      } catch (e) {
+        settings = {};
+      }
     }
   }
   settings = { ...settings };

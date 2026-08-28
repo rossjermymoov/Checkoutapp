@@ -10,9 +10,11 @@ import {
   MapPin,
   Layers,
   Ban,
+  UploadCloud,
 } from 'lucide-react';
 import { SettingsStore } from '../../store/settingsStore';
 import { CheckoutStore } from '../../store/checkoutStore';
+import { adminHeaders } from '../../services/adminAuth';
 import { getServiceCatalogue, ServiceMeta } from '../../services/serviceCatalogue';
 import { ConfiguredService } from '../../types/settings';
 
@@ -33,6 +35,40 @@ export const ServiceCatalogue: React.FC = () => {
 
   const checkout = CheckoutStore.getInstance();
   const checkoutNotices = checkout.unavailableNotices;
+
+  const [publishState, setPublishState] = useState<{
+    busy: boolean;
+    done: boolean;
+    error: string | null;
+    publishedAt: string | null;
+  }>({ busy: false, done: false, error: null, publishedAt: null });
+
+  useEffect(() => {
+    fetch('/api/proxy/settings')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((b) => b?.publishedAt && setPublishState((p) => ({ ...p, publishedAt: b.publishedAt })))
+      .catch(() => {});
+  }, []);
+
+  const publish = async () => {
+    setPublishState((p) => ({ ...p, busy: true, error: null, done: false }));
+    try {
+      const res = await fetch('/api/proxy/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...adminHeaders() },
+        body: JSON.stringify({ settings: JSON.parse(settings.exportConfiguration()) }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        setPublishState((p) => ({ ...p, busy: false, error: body.error || 'Could not publish.' }));
+        return;
+      }
+      setPublishState({ busy: false, done: true, error: null, publishedAt: body.publishedAt });
+      setTimeout(() => setPublishState((p) => ({ ...p, done: false })), 3000);
+    } catch (e) {
+      setPublishState((p) => ({ ...p, busy: false, error: 'Could not reach the server.' }));
+    }
+  };
 
   useEffect(() => settings.subscribe(() => setTick((t) => t + 1)), [settings]);
   useEffect(() => checkout.subscribe(() => setTick((t) => t + 1)), [checkout]);
@@ -162,26 +198,32 @@ export const ServiceCatalogue: React.FC = () => {
         </div>
       )}
 
-      {/* Deployment configuration */}
-      <details className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <summary className="p-3 text-xs font-semibold text-gray-900 cursor-pointer select-none">
-          Share this configuration with a deployed site
-        </summary>
-        <div className="px-3 pb-3 space-y-2 text-xs text-gray-600">
-          <p>
-            Service selections and pricing rules live in this browser. A visitor opening the deployed URL, or you in a
-            private window, starts unconfigured. Copy the JSON below and set it as the{' '}
-            <code className="px-1 bg-gray-100 rounded">CHECKOUT_SETTINGS_JSON</code> environment variable on your host,
-            and every visitor gets this setup. It contains no credentials.
-          </p>
-          <textarea
-            readOnly
-            onFocus={(e) => e.currentTarget.select()}
-            value={settings.exportConfiguration()}
-            className="w-full h-28 p-2 font-mono text-[10px] bg-gray-950 text-emerald-300 rounded-lg border border-gray-800"
-          />
+      {/* Publish to customer links */}
+      <div className="p-3 bg-white border border-gray-200 rounded-xl space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-gray-900">Live on customer links</p>
+            <p className="text-[11px] text-gray-500">
+              {publishState.publishedAt
+                ? `Last published ${new Date(publishState.publishedAt).toLocaleString('en-GB')}`
+                : 'Nothing published yet — customer links are using the environment variable.'}
+            </p>
+          </div>
+          <button
+            onClick={publish}
+            disabled={publishState.busy}
+            className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 flex-shrink-0"
+          >
+            {publishState.done ? <Check className="w-3.5 h-3.5" /> : <UploadCloud className="w-3.5 h-3.5" />}
+            {publishState.busy ? 'Publishing…' : publishState.done ? 'Published' : 'Publish to customer links'}
+          </button>
         </div>
-      </details>
+        {publishState.error && <p className="text-[11px] text-rose-700">{publishState.error}</p>}
+        <p className="text-[11px] text-gray-500">
+          Your selections, pricing rules and wording only reach customer links when you publish. Nothing here is sent
+          until you press it, and credentials are never included.
+        </p>
+      </div>
 
       {/* Display policy */}
       <label className="flex items-start gap-2.5 p-3 bg-white border border-gray-200 rounded-xl cursor-pointer">
