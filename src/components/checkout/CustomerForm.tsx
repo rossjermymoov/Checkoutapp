@@ -7,6 +7,42 @@ interface CustomerFormProps {
   onProceedToShipping: () => void;
 }
 
+interface SampleAddress {
+  label: string;
+  postcode: string;
+  city: string;
+  street: string;
+  county: string;
+  countryIso: string;
+  country: string;
+}
+
+/** Real, deliverable addresses — a made-up postcode would be rejected upstream. */
+const SAMPLE_ADDRESS_GROUPS: Array<{ label: string; addresses: SampleAddress[] }> = [
+  {
+    label: 'United Kingdom',
+    addresses: [
+      { label: 'Oswestry (SY11 4FN)', postcode: 'SY11 4FN', city: 'Oswestry', street: '9 Mellor Meadows', county: 'Shropshire', countryIso: 'GB', country: 'United Kingdom' },
+      { label: 'Birmingham (B66 1BY)', postcode: 'B66 1BY', city: 'Birmingham', street: 'Roebuck Lane', county: 'West Midlands', countryIso: 'GB', country: 'United Kingdom' },
+      { label: 'Leeds (LS1 2JP)', postcode: 'LS1 2JP', city: 'Leeds', street: '2 Infirmary Street', county: 'West Yorkshire', countryIso: 'GB', country: 'United Kingdom' },
+      { label: 'London (SW1A 1AA)', postcode: 'SW1A 1AA', city: 'London', street: 'Buckingham Palace Rd', county: 'Greater London', countryIso: 'GB', country: 'United Kingdom' },
+      { label: 'Inverness (IV1 1AA)', postcode: 'IV1 1AA', city: 'Inverness', street: '1 Academy Street', county: 'Highland', countryIso: 'GB', country: 'United Kingdom' },
+      { label: 'Belfast (BT1 5GS)', postcode: 'BT1 5GS', city: 'Belfast', street: '9 Donegall Square N', county: 'Antrim', countryIso: 'GB', country: 'United Kingdom' },
+    ],
+  },
+  {
+    label: 'International',
+    addresses: [
+      { label: 'New York, USA', postcode: '10001', city: 'New York', street: '350 Fifth Avenue', county: 'NY', countryIso: 'US', country: 'United States' },
+      { label: 'Los Angeles, USA', postcode: '90012', city: 'Los Angeles', street: '200 N Spring Street', county: 'CA', countryIso: 'US', country: 'United States' },
+      { label: 'Berlin, Germany', postcode: '10117', city: 'Berlin', street: 'Unter den Linden 77', county: 'Berlin', countryIso: 'DE', country: 'Germany' },
+      { label: 'Munich, Germany', postcode: '80331', city: 'Munich', street: 'Marienplatz 8', county: 'Bayern', countryIso: 'DE', country: 'Germany' },
+      { label: 'Dublin, Ireland', postcode: 'D02 AF30', city: 'Dublin', street: '1 Grand Canal Square', county: 'Dublin', countryIso: 'IE', country: 'Ireland' },
+      { label: 'Paris, France', postcode: '75001', city: 'Paris', street: '1 Rue de Rivoli', county: 'Paris', countryIso: 'FR', country: 'France' },
+    ],
+  },
+];
+
 export const CustomerForm: React.FC<CustomerFormProps> = ({ onProceedToShipping }) => {
   const checkout = CheckoutStore.getInstance();
   const settings = SettingsStore.getInstance();
@@ -28,12 +64,21 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onProceedToShipping 
     checkout.loadPickupLocations();
   };
 
-  const setSampleAddress = (postcode: string, city: string, street: string, county: string) => {
+  const setSampleAddress = (
+    postcode: string,
+    city: string,
+    street: string,
+    county: string,
+    countryIso: string = 'GB',
+    country: string = 'United Kingdom'
+  ) => {
     checkout.updateCustomer({
       postcode,
       city,
       address1: street,
       county,
+      countryIso,
+      country,
     });
     setTimeout(() => {
       checkout.calculateRates();
@@ -77,61 +122,37 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onProceedToShipping 
         </div>
       </div>
 
-      {/* Quick Test Postcode Presets */}
-      <div className="bg-sky-50/70 border border-sky-100 rounded-xl p-3.5">
-        <div className="flex items-center justify-between mb-2">
+      {/* Quick test addresses, domestic and international */}
+      <div className="bg-sky-50/70 border border-sky-100 rounded-xl p-3.5 space-y-2.5">
+        <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-sky-900 flex items-center gap-1">
             <Sparkles className="w-3.5 h-3.5 text-sky-600" />
-            Quick Test UK Addresses:
+            Quick test addresses
           </span>
           <span className="text-[11px] text-sky-700">Click to autofill</span>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setSampleAddress('SY11 4FN', 'Oswestry', '9 Mellor Meadows', 'Shropshire')}
-            className={`text-xs px-2.5 py-1 rounded-lg border font-medium transition-all ${
-              customer.postcode === 'SY11 4FN'
-                ? 'bg-sky-600 text-white border-sky-600 shadow-sm'
-                : 'bg-white text-sky-900 border-sky-200 hover:bg-sky-100'
-            }`}
-          >
-            Oswestry (SY11 4FN)
-          </button>
-          <button
-            type="button"
-            onClick={() => setSampleAddress('B66 1BY', 'Birmingham', 'Roebuck Lane', 'West Midlands')}
-            className={`text-xs px-2.5 py-1 rounded-lg border font-medium transition-all ${
-              customer.postcode === 'B66 1BY'
-                ? 'bg-sky-600 text-white border-sky-600 shadow-sm'
-                : 'bg-white text-sky-900 border-sky-200 hover:bg-sky-100'
-            }`}
-          >
-            Birmingham (B66 1BY)
-          </button>
-          <button
-            type="button"
-            onClick={() => setSampleAddress('LS1 2JP', 'Leeds', '2 Infirmary Street', 'West Yorkshire')}
-            className={`text-xs px-2.5 py-1 rounded-lg border font-medium transition-all ${
-              customer.postcode === 'LS1 2JP'
-                ? 'bg-sky-600 text-white border-sky-600 shadow-sm'
-                : 'bg-white text-sky-900 border-sky-200 hover:bg-sky-100'
-            }`}
-          >
-            Leeds (LS1 2JP)
-          </button>
-          <button
-            type="button"
-            onClick={() => setSampleAddress('SW1A 1AA', 'London', 'Buckingham Palace Rd', 'Greater London')}
-            className={`text-xs px-2.5 py-1 rounded-lg border font-medium transition-all ${
-              customer.postcode === 'SW1A 1AA'
-                ? 'bg-sky-600 text-white border-sky-600 shadow-sm'
-                : 'bg-white text-sky-900 border-sky-200 hover:bg-sky-100'
-            }`}
-          >
-            London (SW1A 1AA)
-          </button>
-        </div>
+
+        {SAMPLE_ADDRESS_GROUPS.map((group) => (
+          <div key={group.label} className="space-y-1.5">
+            <span className="block text-[10px] uppercase tracking-wider font-bold text-sky-700/70">{group.label}</span>
+            <div className="flex flex-wrap gap-2">
+              {group.addresses.map((a) => (
+                <button
+                  key={a.label}
+                  type="button"
+                  onClick={() => setSampleAddress(a.postcode, a.city, a.street, a.county, a.countryIso, a.country)}
+                  className={`text-xs px-2.5 py-1 rounded-lg border font-medium transition-all ${
+                    customer.postcode === a.postcode
+                      ? 'bg-sky-600 text-white border-sky-600 shadow-sm'
+                      : 'bg-white text-sky-900 border-sky-200 hover:bg-sky-100'
+                  }`}
+                >
+                  {a.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Contact Section */}
@@ -233,6 +254,9 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onProceedToShipping 
               <option value="IE">Ireland (IE)</option>
               <option value="FR">France (FR)</option>
               <option value="DE">Germany (DE)</option>
+              <option value="US">United States (US)</option>
+              <option value="ES">Spain (ES)</option>
+              <option value="NL">Netherlands (NL)</option>
             </select>
           </div>
 
