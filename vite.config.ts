@@ -117,6 +117,8 @@ function apiProxyPlugin(): Plugin {
                 'api-user': apiUser,
                 'api-token': apiToken,
                 'api-key': apiToken,
+                'API user': apiUser,
+                'API token': apiToken,
                 'Content-Type': 'application/json',
               },
             });

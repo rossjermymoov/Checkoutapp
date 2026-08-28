@@ -70,16 +70,36 @@ export async function getMoovParcelPresets(
       source: 'live'
     });
 
-    if (!res.ok || !Array.isArray(data)) {
-      const errorMsg = Array.isArray(data) ? null : (data?.error || (typeof data === 'string' ? data : JSON.stringify(data)));
+    // Robust parsing: extract preset array from any returned wrapper
+    let presetList: VoilaPreset[] = [];
+    if (Array.isArray(data)) {
+      if (data.length > 0 && typeof data[0] === 'object' && data[0] !== null) {
+        presetList = data;
+      }
+    } else if (data && typeof data === 'object') {
+      if (Array.isArray(data.presets)) presetList = data.presets;
+      else if (Array.isArray(data.user_presets)) presetList = data.user_presets;
+      else if (Array.isArray(data.data)) presetList = data.data;
+      else if (Array.isArray(data.services)) presetList = data.services;
+    }
+
+    if (!res.ok || presetList.length === 0) {
+      let errorMsg = '';
+      if (Array.isArray(data) && data.length > 0 && typeof data[0] === 'string') {
+        errorMsg = data.join(', ');
+      } else if (data && typeof data === 'object') {
+        errorMsg = data.error || data.message || (data.raw ? data.raw.substring(0, 150) : null);
+      } else if (typeof data === 'string') {
+        errorMsg = data;
+      }
       return {
         presets: [],
         fromLive: false,
-        error: errorMsg || `HTTP ${res.status}: Failed to fetch MoovParcel presets`
+        error: errorMsg || `HTTP ${res.status}: ${res.status === 401 ? 'Authentication required. Check api-user and api-token.' : 'Failed to fetch MoovParcel presets'}`
       };
     }
 
-    return { presets: data, fromLive: true };
+    return { presets: presetList, fromLive: true };
   } catch (err: any) {
     const durationMs = Date.now() - startTime;
     emitLog({
