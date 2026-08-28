@@ -1,16 +1,182 @@
-import { defineConfig } from 'vite';
+import { defineConfig, Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+
+// Custom Vite plugin to handle API proxying directly on the Vite dev server port (avoiding extra port conflicts)
+function apiProxyPlugin(): Plugin {
+  return {
+    name: 'api-proxy-plugin',
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        if (!req.url || !req.url.startsWith('/api/proxy')) {
+          return next();
+        }
+
+        const urlPath = req.url.split('?')[0];
+        console.log(`[VITE PROXY] ${req.method} ${urlPath}`);
+
+        // Helper to read JSON request body
+        const readBody = (): Promise<any> => {
+          return new Promise((resolve) => {
+            let data = '';
+            req.on('data', (chunk) => {
+              data += chunk;
+            });
+            req.on('end', () => {
+              try {
+                resolve(data ? JSON.parse(data) : {});
+              } catch (e) {
+                resolve({});
+              }
+            });
+          });
+        };
+
+        const sendJsonResponse = (statusCode: number, data: any) => {
+          res.statusCode = statusCode;
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+          res.setHeader('Access-Control-Allow-Headers', '*');
+          res.end(JSON.stringify(data));
+        };
+
+        if (req.method === 'OPTIONS') {
+          res.statusCode = 204;
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+          res.setHeader('Access-Control-Allow-Headers', '*');
+          return res.end();
+        }
+
+        try {
+          // 1. Health check
+          if (urlPath === '/api/proxy/health') {
+            return sendJsonResponse(200, { status: 'ok', server: 'vite-integrated-proxy' });
+          }
+
+          // 2. BillingAPI Get Quote
+          if (urlPath === '/api/proxy/billing-quote' && req.method === 'POST') {
+            const body = await readBody();
+            const clientName = (req.headers['client_name'] as string) || 'Moov Parcel';
+            const customerDcId = (req.headers['customer_dc_id'] as string) || 'Kitloop';
+            const customerKey = (req.headers['customer_key'] as string) || 'b62e9045a42d43468840c6e07b568fcd';
+            const customUrl = (req.headers['x-endpoint-url'] as string) || 'https://production.billingapi.co.uk/api/customer-routes/get-quote';
+
+            console.log(`[VITE PROXY -> BillingAPI] Quoting at ${customUrl} for client: "${clientName}", dc: "${customerDcId}"`);
+
+            const upstreamRes = await fetch(customUrl, {
+              method: 'POST',
+              headers: {
+                'client_name': clientName,
+                'customer_dc_id': customerDcId,
+                'customer_key': customerKey,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(body),
+            });
+
+            const text = await upstreamRes.text();
+            let parsedData: any;
+            try {
+              parsedData = JSON.parse(text);
+            } catch (err) {
+              console.warn(`[VITE PROXY] BillingAPI returned non-JSON (${upstreamRes.status}):`, text.substring(0, 200));
+              return sendJsonResponse(upstreamRes.status, {
+                error: `Upstream BillingAPI returned non-JSON response (HTTP ${upstreamRes.status})`,
+                raw: text.substring(0, 300)
+              });
+            }
+
+            return sendJsonResponse(upstreamRes.status, parsedData);
+          }
+
+          // 3. HeyVoila Presets: /api/proxy/presets/:courier
+          if (urlPath.startsWith('/api/proxy/presets/') && req.method === 'GET') {
+            const courier = decodeURIComponent(urlPath.replace('/api/proxy/presets/', ''));
+            const apiUser = (req.headers['api-user'] as string) || '';
+            const apiToken = (req.headers['api-token'] as string) || '';
+
+            const targetUrl = `https://app.heyvoila.io/api/couriers/v1/${encodeURIComponent(courier)}/presets`;
+            console.log(`[VITE PROXY -> HeyVoila] Fetching presets for "${courier}" at ${targetUrl}`);
+
+            const upstreamRes = await fetch(targetUrl, {
+              method: 'GET',
+              headers: {
+                'api-user': apiUser,
+                'api-token': apiToken,
+                'Content-Type': 'application/json',
+              },
+            });
+
+            const text = await upstreamRes.text();
+            let parsedData: any;
+            try {
+              parsedData = JSON.parse(text);
+            } catch (err) {
+              console.warn(`[VITE PROXY] HeyVoila presets returned non-JSON (${upstreamRes.status}):`, text.substring(0, 200));
+              return sendJsonResponse(upstreamRes.status, {
+                error: `Upstream HeyVoila returned non-JSON response (HTTP ${upstreamRes.status})`,
+                raw: text.substring(0, 300)
+              });
+            }
+
+            return sendJsonResponse(upstreamRes.status, parsedData);
+          }
+
+          // 4. HeyVoila Pickup Locations: /api/proxy/pickup-locations/:courier
+          if (urlPath.startsWith('/api/proxy/pickup-locations/') && req.method === 'POST') {
+            const courier = decodeURIComponent(urlPath.replace('/api/proxy/pickup-locations/', ''));
+            const apiUser = (req.headers['api-user'] as string) || '';
+            const apiToken = (req.headers['api-token'] as string) || '';
+            const body = await readBody();
+
+            const targetUrl = `https://app.heyvoila.io/api/couriers/v1/${encodeURIComponent(courier)}/get-pickup-locations`;
+            console.log(`[VITE PROXY -> HeyVoila] Fetching pickup locations for "${courier}" at ${targetUrl}`);
+
+            const upstreamRes = await fetch(targetUrl, {
+              method: 'POST',
+              headers: {
+                'api-user': apiUser,
+                'api-token': apiToken,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(body),
+            });
+
+            const text = await upstreamRes.text();
+            let parsedData: any;
+            try {
+              parsedData = JSON.parse(text);
+            } catch (err) {
+              console.warn(`[VITE PROXY] HeyVoila pickup locations returned non-JSON (${upstreamRes.status}):`, text.substring(0, 200));
+              return sendJsonResponse(upstreamRes.status, {
+                error: `Upstream HeyVoila returned non-JSON response (HTTP ${upstreamRes.status})`,
+                raw: text.substring(0, 300)
+              });
+            }
+
+            return sendJsonResponse(upstreamRes.status, parsedData);
+          }
+
+          // Fallback if route not matched
+          return sendJsonResponse(404, { error: `Proxy route not found: ${urlPath}` });
+        } catch (error: any) {
+          console.error('[VITE PROXY ERROR]', error);
+          return sendJsonResponse(500, {
+            error: error.message || 'Internal proxy error',
+            stack: error.stack
+          });
+        }
+      });
+    }
+  };
+}
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), apiProxyPlugin()],
   server: {
     port: 5173,
-    proxy: {
-      '/api/proxy': {
-        target: 'http://localhost:3001',
-        changeOrigin: true,
-      },
-    },
+    host: true,
   },
 });

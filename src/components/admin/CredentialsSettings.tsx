@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { Key, Shield, Check, RefreshCw, AlertCircle, Eye, EyeOff, Lock, Server } from 'lucide-react';
+import { Key, Shield, Check, RefreshCw, AlertCircle, Lock } from 'lucide-react';
 import { SettingsStore } from '../../store/settingsStore';
 import { ApiCredentials } from '../../types/settings';
-import { getCourierPresets } from '../../services/api';
+import { getCourierPresets, getBillingQuote } from '../../services/api';
+import { DEFAULT_CUSTOMER } from '../../services/mockData';
 
 export const CredentialsSettings: React.FC = () => {
   const settings = SettingsStore.getInstance();
   const [credentials, setCredentials] = useState<ApiCredentials>(settings.credentials);
-  const [showTokens, setShowTokens] = useState<Record<string, boolean>>({});
   const [testStatus, setTestStatus] = useState<{ loading: boolean; success?: boolean; message?: string }>({
     loading: false,
   });
@@ -21,31 +21,43 @@ export const CredentialsSettings: React.FC = () => {
   const handleTestConnection = async () => {
     setTestStatus({ loading: true });
     try {
-      const res = await getCourierPresets('DPD', credentials);
-      if (res.fromLive) {
+      // Test 1: BillingAPI
+      const quoteRes = await getBillingQuote(DEFAULT_CUSTOMER, credentials);
+      // Test 2: HeyVoila Presets
+      const presetsRes = await getCourierPresets('DPD', credentials);
+
+      if (quoteRes.fromLive && presetsRes.fromLive) {
         setTestStatus({
           loading: false,
           success: true,
-          message: `Live Voila API Connection verified! Retrieved ${res.presets.length} DPD presets.`,
+          message: `All Live APIs Connected! Live quotes retrieved (${Object.keys(quoteRes.quotes).length} services) and ${presetsRes.presets.length} DPD presets synced.`,
+        });
+      } else if (quoteRes.fromLive) {
+        setTestStatus({
+          loading: false,
+          success: true,
+          message: `Live BillingAPI Connected (${Object.keys(quoteRes.quotes).length} live rates). HeyVoila returned: ${presetsRes.error || 'auth required'} (using fallback presets).`,
+        });
+      } else if (presetsRes.fromLive) {
+        setTestStatus({
+          loading: false,
+          success: true,
+          message: `Live HeyVoila Connected (${presetsRes.presets.length} presets). BillingAPI: ${quoteRes.error || 'using mock rates'}.`,
         });
       } else {
         setTestStatus({
           loading: false,
           success: false,
-          message: res.error || 'Could not connect to live API with these credentials. Using Sandbox / Mock data.',
+          message: `API Response: ${quoteRes.error || presetsRes.error || 'Credentials rejected by live endpoints'}. System is running in fallback mode.`,
         });
       }
     } catch (e: any) {
       setTestStatus({
         loading: false,
         success: false,
-        message: e.message || 'API connection failed',
+        message: e.message || 'API connection test failed',
       });
     }
-  };
-
-  const toggleShowToken = (field: string) => {
-    setShowTokens((prev) => ({ ...prev, [field]: !prev[field] }));
   };
 
   return (
@@ -86,7 +98,7 @@ export const CredentialsSettings: React.FC = () => {
           <div>
             <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
               <Shield className="w-4 h-4 text-sky-600" />
-              HeyVoila API Credentials (<code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-700">api.heyvoila.io</code>)
+              HeyVoila API Credentials (<code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-700">app.heyvoila.io</code>)
             </h4>
             <p className="text-xs text-gray-500 mt-0.5">Used for retrieving courier service presets and Drop Shop / pickup locker locations</p>
           </div>
@@ -127,7 +139,7 @@ export const CredentialsSettings: React.FC = () => {
               type="text"
               value={credentials.voilaAuthCompany}
               onChange={(e) => handleUpdate('voilaAuthCompany', e.target.value)}
-              placeholder="e.g. DemoCompany / YTC"
+              placeholder="e.g. YTC"
               className="w-full px-3.5 py-2 bg-gray-50/70 border border-gray-300 rounded-xl text-xs font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition-all"
             />
           </div>
@@ -155,7 +167,7 @@ export const CredentialsSettings: React.FC = () => {
               type="text"
               value={credentials.billingClientName}
               onChange={(e) => handleUpdate('billingClientName', e.target.value)}
-              placeholder="e.g. Demo Client"
+              placeholder="e.g. Moov Parcel"
               className="w-full px-3.5 py-2 bg-gray-50/70 border border-gray-300 rounded-xl text-xs font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
             />
           </div>
@@ -211,7 +223,7 @@ export const CredentialsSettings: React.FC = () => {
             </div>
           )}
           {!testStatus.message && (
-            <span className="text-gray-500">Test and verify your credentials with HeyVoila servers</span>
+            <span className="text-gray-500">Test and verify your credentials with live endpoints</span>
           )}
         </div>
 

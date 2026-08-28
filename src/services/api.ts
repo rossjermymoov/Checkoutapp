@@ -1,5 +1,5 @@
 import { ApiCredentials } from '../types/settings';
-import { VoilaPreset, PickupLocationItem, BillingQuoteItem, ApiLogEntry } from '../types/api';
+import { VoilaPreset, PickupLocationItem, ApiLogEntry } from '../types/api';
 import { CustomerDetails } from '../types/checkout';
 import { MOCK_PRESETS_BY_COURIER, MOCK_PICKUP_LOCATIONS, MOCK_BILLING_QUOTES } from './mockData';
 
@@ -16,6 +16,24 @@ const emitLog = (entry: ApiLogEntry) => {
     logListener(entry);
   }
 };
+
+// Safe fetch response parser to prevent unexpected token syntax errors
+async function safeParseResponse(res: Response): Promise<{ data: any; isJson: boolean; rawText: string }> {
+  const text = await res.text();
+  try {
+    const data = JSON.parse(text);
+    return { data, isJson: true, rawText: text };
+  } catch (e) {
+    return {
+      data: {
+        error: `Server returned non-JSON response (HTTP ${res.status})`,
+        message: text.substring(0, 300) || 'Empty or invalid response',
+      },
+      isJson: false,
+      rawText: text,
+    };
+  }
+}
 
 // 1. HeyVoila API: Get Presets (GET /api/couriers/v1/:courier/presets)
 export async function getCourierPresets(
@@ -52,7 +70,7 @@ export async function getCourierPresets(
       method: 'GET',
     });
 
-    const data = await res.json();
+    const { data, isJson } = await safeParseResponse(res);
     const durationMs = Date.now() - startTime;
 
     emitLog({
@@ -64,13 +82,17 @@ export async function getCourierPresets(
       responseStatus: res.status,
       responseBody: data,
       durationMs,
-      success: res.ok,
+      success: res.ok && isJson && Array.isArray(data),
       source: 'live'
     });
 
     if (!res.ok || !Array.isArray(data)) {
       console.warn(`[API] Live Presets failed for ${courier}, falling back to mock presets:`, data);
-      return { presets: MOCK_PRESETS_BY_COURIER[courier] || [], fromLive: false, error: data?.error || 'Failed to fetch presets' };
+      return {
+        presets: MOCK_PRESETS_BY_COURIER[courier] || [],
+        fromLive: false,
+        error: (Array.isArray(data) ? null : data?.error) || `HTTP ${res.status}: Failed to fetch presets`
+      };
     }
 
     return { presets: data, fromLive: true };
@@ -151,7 +173,7 @@ export async function getPickupLocations(
       body: JSON.stringify(body),
     });
 
-    const data = await res.json();
+    const { data, isJson } = await safeParseResponse(res);
     const durationMs = Date.now() - startTime;
 
     emitLog({
@@ -164,13 +186,17 @@ export async function getPickupLocations(
       responseStatus: res.status,
       responseBody: data,
       durationMs,
-      success: res.ok,
+      success: res.ok && isJson && Array.isArray(data),
       source: 'live'
     });
 
     if (!res.ok || !Array.isArray(data)) {
       console.warn(`[API] Live Pickup Locations failed for ${courier}, falling back to mock:`, data);
-      return { locations: MOCK_PICKUP_LOCATIONS, fromLive: false, error: data?.error || 'Failed to fetch pickup locations' };
+      return {
+        locations: MOCK_PICKUP_LOCATIONS,
+        fromLive: false,
+        error: (Array.isArray(data) ? null : data?.error) || `HTTP ${res.status}: Failed to fetch pickup locations`
+      };
     }
 
     const locationsWithCourier: PickupLocationItem[] = data.map((item: any) => ({
@@ -210,9 +236,9 @@ export async function getBillingQuote(
   const startTime = Date.now();
   const endpoint = '/api/proxy/billing-quote';
   const headers: Record<string, string> = {
-    'client_name': credentials.billingClientName,
-    'customer_dc_id': credentials.billingCustomerDcId,
-    'customer_key': credentials.billingCustomerKey,
+    'client_name': credentials.billingClientName || 'Moov Parcel',
+    'customer_dc_id': credentials.billingCustomerDcId || 'Kitloop',
+    'customer_key': credentials.billingCustomerKey || 'b62e9045a42d43468840c6e07b568fcd',
     'x-endpoint-url': credentials.billingEndpointUrl,
     'Content-Type': 'application/json',
   };
@@ -310,7 +336,7 @@ export async function getBillingQuote(
       body: JSON.stringify(body),
     });
 
-    const data = await res.json();
+    const { data, isJson } = await safeParseResponse(res);
     const durationMs = Date.now() - startTime;
 
     emitLog({
@@ -323,13 +349,17 @@ export async function getBillingQuote(
       responseStatus: res.status,
       responseBody: data,
       durationMs,
-      success: res.ok,
+      success: res.ok && isJson,
       source: 'live'
     });
 
     if (!res.ok) {
       console.warn('[API] Live Quote failed, falling back to mock quotes:', data);
-      return { quotes: MOCK_BILLING_QUOTES, fromLive: false, error: data?.error || 'Quote endpoint returned non-200' };
+      return {
+        quotes: MOCK_BILLING_QUOTES,
+        fromLive: false,
+        error: data?.error || `HTTP ${res.status}: Quote endpoint error`
+      };
     }
 
     const priceMap: Record<string, number> = {};

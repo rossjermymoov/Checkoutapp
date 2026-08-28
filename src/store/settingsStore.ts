@@ -107,8 +107,8 @@ const INITIAL_SERVICES: ConfiguredService[] = [
 const DEFAULT_CREDENTIALS: ApiCredentials = {
   voilaApiUser: 'ross.jermy@gmail.com',
   voilaApiToken: 'voila_live_sec_789412984102',
-  voilaAuthCompany: 'Demo',
-  billingClientName: 'Demo Client',
+  voilaAuthCompany: 'YTC',
+  billingClientName: 'Moov Parcel',
   billingCustomerDcId: 'Kitloop',
   billingCustomerKey: 'b62e9045a42d43468840c6e07b568fcd',
   billingEndpointUrl: 'https://production.billingapi.co.uk/api/customer-routes/get-quote',
