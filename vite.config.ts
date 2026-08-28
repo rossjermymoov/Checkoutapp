@@ -111,15 +111,20 @@ function apiProxyPlugin(): Plugin {
             const targetUrl = `https://app.heyvoila.io/api/couriers/v1/${encodeURIComponent(courier)}/presets`;
             console.log(`[VITE PROXY -> HeyVoila] GET presets for "${courier}" at ${targetUrl} (api-user: "${apiUser}", token: "${apiToken ? apiToken.substring(0, 4) + '...' : ''}")`);
 
+            const authHeaders: Record<string, string> = {
+              'api-user': apiUser,
+              'api-token': apiToken,
+              'Accept': 'application/json',
+              'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+              'Content-Type': 'application/json',
+            };
+            if (apiUser && apiToken) {
+              authHeaders['Authorization'] = 'Basic ' + Buffer.from(`${apiUser}:${apiToken}`).toString('base64');
+            }
+
             const upstreamRes = await fetch(targetUrl, {
               method: 'GET',
-              headers: {
-                'api-user': apiUser,
-                'api-token': apiToken,
-                'Accept': 'application/json',
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                'Content-Type': 'application/json',
-              },
+              headers: authHeaders,
             });
 
             const text = await upstreamRes.text();
@@ -150,15 +155,20 @@ function apiProxyPlugin(): Plugin {
             const targetUrl = `https://app.heyvoila.io/api/couriers/v1/${encodeURIComponent(courier)}/get-pickup-locations`;
             console.log(`[VITE PROXY -> HeyVoila] Fetching pickup locations for "${courier}" at ${targetUrl}`);
 
+            const pickupAuthHeaders: Record<string, string> = {
+              'api-user': apiUser,
+              'api-token': apiToken,
+              'Accept': 'application/json',
+              'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+              'Content-Type': 'application/json',
+            };
+            if (apiUser && apiToken) {
+              pickupAuthHeaders['Authorization'] = 'Basic ' + Buffer.from(`${apiUser}:${apiToken}`).toString('base64');
+            }
+
             const upstreamRes = await fetch(targetUrl, {
               method: 'POST',
-              headers: {
-                'api-user': apiUser,
-                'api-token': apiToken,
-                'Accept': 'application/json',
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                'Content-Type': 'application/json',
-              },
+              headers: pickupAuthHeaders,
               body: JSON.stringify(body),
             });
 

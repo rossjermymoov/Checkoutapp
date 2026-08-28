@@ -88,15 +88,20 @@ app.get('/api/proxy/presets/:courier', async (req, res) => {
   const targetUrl = `https://app.heyvoila.io/api/couriers/v1/${encodeURIComponent(courier)}/presets`;
   console.log(`[PROXY -> HeyVoila] Fetching presets for courier "${courier}" at ${targetUrl}`);
 
+  const authHeaders = {
+    'api-user': apiUser || '',
+    'api-token': apiToken || '',
+    'Accept': 'application/json',
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'Content-Type': 'application/json',
+  };
+  if (apiUser && apiToken) {
+    authHeaders['Authorization'] = 'Basic ' + Buffer.from(`${apiUser}:${apiToken}`).toString('base64');
+  }
+
   await handleUpstreamFetch(res, targetUrl, {
     method: 'GET',
-    headers: {
-      'api-user': apiUser || '',
-      'api-token': apiToken || '',
-      'Accept': 'application/json',
-      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-      'Content-Type': 'application/json',
-    },
+    headers: authHeaders,
   });
 });
 
@@ -109,15 +114,20 @@ app.post('/api/proxy/pickup-locations/:courier', async (req, res) => {
   const targetUrl = `https://app.heyvoila.io/api/couriers/v1/${encodeURIComponent(courier)}/get-pickup-locations`;
   console.log(`[PROXY -> HeyVoila] Fetching pickup locations for courier "${courier}" at ${targetUrl}`);
 
+  const pickupAuthHeaders = {
+    'api-user': apiUser || '',
+    'api-token': apiToken || '',
+    'Accept': 'application/json',
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'Content-Type': 'application/json',
+  };
+  if (apiUser && apiToken) {
+    pickupAuthHeaders['Authorization'] = 'Basic ' + Buffer.from(`${apiUser}:${apiToken}`).toString('base64');
+  }
+
   await handleUpstreamFetch(res, targetUrl, {
     method: 'POST',
-    headers: {
-      'api-user': apiUser || '',
-      'api-token': apiToken || '',
-      'Accept': 'application/json',
-      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-      'Content-Type': 'application/json',
-    },
+    headers: pickupAuthHeaders,
     body: JSON.stringify(req.body),
   });
 });
