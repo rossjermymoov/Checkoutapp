@@ -4,6 +4,7 @@ import { CheckoutStore } from '../../store/checkoutStore';
 import { SettingsStore } from '../../store/settingsStore';
 import { PickupLocationItem } from '../../types/api';
 import { DropShopMap } from './DropShopMap';
+import { CourierLogo } from '../common/CourierLogo';
 
 interface DropShopPickerProps {
   onProceedToPayment: () => void;
@@ -38,14 +39,7 @@ export const DropShopPicker: React.FC<DropShopPickerProps> = ({
     checkout.loadPickupLocations();
   };
 
-  const getCourierColor = (courier?: string) => {
-    const c = (courier || '').toLowerCase();
-    if (c.includes('dpd')) return 'bg-red-50 text-red-700 border-red-200';
-    if (c.includes('inpost')) return 'bg-yellow-50 text-yellow-800 border-yellow-200';
-    if (c.includes('evri')) return 'bg-blue-50 text-blue-700 border-blue-200';
-    if (c.includes('ups')) return 'bg-amber-50 text-amber-900 border-amber-200';
-    return 'bg-gray-100 text-gray-800 border-gray-200';
-  };
+  // Courier colour badges replaced by the courier logo itself.
 
   return (
     <div className="space-y-6">
@@ -175,12 +169,11 @@ export const DropShopPicker: React.FC<DropShopPickerProps> = ({
                       {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
                     </div>
 
+                    <CourierLogo courier={courier} size={36} />
+
                     <div className="space-y-1 min-w-0">
                       <div className="flex items-center space-x-2 flex-wrap">
                         <span className="text-sm font-bold text-gray-900 truncate">{org}</span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getCourierColor(courier)}`}>
-                          {courier} Network
-                        </span>
                       </div>
 
                       <p className="text-xs text-gray-600">

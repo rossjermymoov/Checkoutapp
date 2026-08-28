@@ -85,7 +85,7 @@ export const INITIAL_COURIERS: CourierConfig[] = [
   {
     key: "InPost",
     name: "InPost",
-    logo: "https://app.heyvoila.io/courier-service-logos/inpost.jpg",
+    logo: "https://app.heyvoila.io/courier-service-logos/InPost.png",
     enabled: false,
   },
   {

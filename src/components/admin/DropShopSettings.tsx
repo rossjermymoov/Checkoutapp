@@ -1,6 +1,7 @@
 import React from 'react';
 import { MapPin, Navigation, Sliders, CheckCircle2 } from 'lucide-react';
 import { SettingsStore } from '../../store/settingsStore';
+import { CourierLogo } from '../common/CourierLogo';
 
 export const DropShopSettings: React.FC = () => {
   const settings = SettingsStore.getInstance();
@@ -27,7 +28,7 @@ export const DropShopSettings: React.FC = () => {
 
   const availableNetworks = enabledCouriers.map((c) => ({
     key: c.key,
-    name: `${c.name} Pickup / Access Point Network`,
+    name: c.name,
   }));
 
   return (
@@ -128,7 +129,8 @@ export const DropShopSettings: React.FC = () => {
                       >
                         {isChecked && <CheckCircle2 className="w-3.5 h-3.5" />}
                       </div>
-                      <span className="text-xs font-semibold text-gray-900">{net.name}</span>
+                      <CourierLogo courier={net.key} size={28} showName />
+                      <span className="text-[10px] text-gray-500">Pickup / access points</span>
                     </div>
                   </div>
                 );

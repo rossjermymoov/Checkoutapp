@@ -3,6 +3,7 @@ import { Truck, Clock, CheckCircle2, RefreshCw, AlertCircle, Info, Leaf, Chevron
 import { CheckoutStore } from '../../store/checkoutStore';
 import { SettingsStore } from '../../store/settingsStore';
 import { SelectedShippingOption } from '../../types/checkout';
+import { CourierLogo } from '../common/CourierLogo';
 
 interface DeliverySelectorProps {
   onProceedToPayment: () => void;
@@ -51,18 +52,8 @@ export const DeliverySelector: React.FC<DeliverySelectorProps> = ({
     return { service: cheapestPickup, saving };
   })();
 
-  const getCourierLogo = (courierName: string) => {
-    const courier = settings.couriers.find(
-      (c) => c.key.toLowerCase() === courierName.toLowerCase() || c.name.toLowerCase().includes(courierName.toLowerCase())
-    );
-    if (courier && courier.logo) return courier.logo;
-    if (courierName.toLowerCase().includes('dpd')) return 'https://app.heyvoila.io/courier-service-logos/dpd.jpg';
-    if (courierName.toLowerCase().includes('evri')) return 'https://app.heyvoila.io/courier-service-logos/evri.jpg';
-    if (courierName.toLowerCase().includes('ups')) return 'https://app.heyvoila.io/courier-service-logos/ups.jpg';
-    if (courierName.toLowerCase().includes('dhl')) return 'https://app.heyvoila.io/courier-service-logos/dhl.jpg';
-    if (courierName.toLowerCase().includes('royal')) return 'https://app.heyvoila.io/courier-service-logos/royalmail.jpg';
-    return 'https://app.heyvoila.io/courier-service-logos/dpd.jpg';
-  };
+  // Courier artwork comes from the Voila account via CourierLogo, rather than
+  // guessing at filenames on the CDN. Two of the previous guesses were wrong.
 
   return (
     <div className="space-y-6">
@@ -221,7 +212,6 @@ export const DeliverySelector: React.FC<DeliverySelectorProps> = ({
         <div className="space-y-3">
           {rates.map((option) => {
             const isSelected = selected?.serviceId === option.serviceId;
-            const logo = getCourierLogo(option.courier);
 
             return (
               <div
@@ -244,17 +234,7 @@ export const DeliverySelector: React.FC<DeliverySelectorProps> = ({
                       {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
                     </div>
 
-                    {/* Courier Logo */}
-                    <div className="w-11 h-11 rounded-lg bg-gray-50 border border-gray-200 flex items-center justify-center p-1 flex-shrink-0 overflow-hidden shadow-xs">
-                      <img
-                        src={logo}
-                        alt={option.courier}
-                        className="max-h-full max-w-full object-contain"
-                        onError={(e) => {
-                          (e.currentTarget as HTMLElement).style.display = 'none';
-                        }}
-                      />
-                    </div>
+                    <CourierLogo courier={option.courier} size={44} />
 
                     {/* Service Name & Transit Time */}
                     <div className="min-w-0">
