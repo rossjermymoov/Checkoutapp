@@ -1,4 +1,5 @@
 // Types for Voila & Billing API structures
+export type { ApiLogEntry } from './settings';
 
 export interface VoilaPreset {
   id: number;

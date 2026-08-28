@@ -1,22 +1,23 @@
-import { ApiCredentials, ApiLogEntry } from '../types/settings';
-import { VoilaPreset, PickupLocationItem, BillingQuoteItem } from '../types/api';
+import { ApiCredentials } from '../types/settings';
+import { VoilaPreset, PickupLocationItem, BillingQuoteItem, ApiLogEntry } from '../types/api';
 import { CustomerDetails } from '../types/checkout';
 import { MOCK_PRESETS_BY_COURIER, MOCK_PICKUP_LOCATIONS, MOCK_BILLING_QUOTES } from './mockData';
 
-// Helper to log API calls
-let logCallback: ((entry: ApiLogEntry) => void) | null = null;
+// Global logger subscriber
+type LogListener = (entry: ApiLogEntry) => void;
+let logListener: LogListener | null = null;
 
-export const setApiLogListener = (cb: (entry: ApiLogEntry) => void) => {
-  logCallback = cb;
+export const setApiLogListener = (listener: LogListener) => {
+  logListener = listener;
 };
 
 const emitLog = (entry: ApiLogEntry) => {
-  if (logCallback) {
-    logCallback(entry);
+  if (logListener) {
+    logListener(entry);
   }
 };
 
-// 1. Fetch Presets / Services for Courier
+// 1. HeyVoila API: Get Presets (GET /api/couriers/v1/:courier/presets)
 export async function getCourierPresets(
   courier: string,
   credentials: ApiCredentials
@@ -26,13 +27,10 @@ export async function getCourierPresets(
   const headers: Record<string, string> = {
     'api-user': credentials.voilaApiUser,
     'api-token': credentials.voilaApiToken,
-    'auth_company': credentials.voilaAuthCompany,
-    'Content-Type': 'application/json',
   };
 
   if (!credentials.useLiveApi) {
-    // Return mock presets
-    const presets = MOCK_PRESETS_BY_COURIER[courier] || [];
+    const mockList = MOCK_PRESETS_BY_COURIER[courier] || [];
     emitLog({
       id: Math.random().toString(36).substring(7),
       timestamp: new Date().toLocaleTimeString(),
@@ -40,18 +38,18 @@ export async function getCourierPresets(
       method: 'GET',
       headers,
       responseStatus: 200,
-      responseBody: { presets },
+      responseBody: mockList,
       durationMs: 45,
       success: true,
       source: 'mock'
     });
-    return { presets, fromLive: false };
+    return { presets: mockList, fromLive: false };
   }
 
   try {
     const res = await fetch(endpoint, {
-      method: 'GET',
       headers,
+      method: 'GET',
     });
 
     const data = await res.json();
@@ -70,18 +68,12 @@ export async function getCourierPresets(
       source: 'live'
     });
 
-    if (!res.ok) {
-      console.warn(`[API] Live Presets failed for ${courier}, falling back to mock:`, data);
-      const fallback = MOCK_PRESETS_BY_COURIER[courier] || [];
-      return { presets: fallback, fromLive: false, error: data?.error || 'Live API returned non-200' };
+    if (!res.ok || !Array.isArray(data)) {
+      console.warn(`[API] Live Presets failed for ${courier}, falling back to mock presets:`, data);
+      return { presets: MOCK_PRESETS_BY_COURIER[courier] || [], fromLive: false, error: data?.error || 'Failed to fetch presets' };
     }
 
-    const presetsList: VoilaPreset[] = [
-      ...(Array.isArray(data?.presets) ? data.presets : []),
-      ...(Array.isArray(data?.user_presets) ? data.user_presets : [])
-    ];
-
-    return { presets: presetsList.length > 0 ? presetsList : (MOCK_PRESETS_BY_COURIER[courier] || []), fromLive: true };
+    return { presets: data, fromLive: true };
   } catch (err: any) {
     const durationMs = Date.now() - startTime;
     emitLog({
@@ -100,7 +92,7 @@ export async function getCourierPresets(
   }
 }
 
-// 2. Fetch Pickup / Drop Shop Locations
+// 2. HeyVoila API: Get Pickup Locations (POST /api/couriers/v1/:courier/get-pickup-locations)
 export async function getPickupLocations(
   courier: string,
   customer: CustomerDetails,
@@ -120,7 +112,7 @@ export async function getPickupLocations(
     address: {
       name: `${customer.firstName} ${customer.lastName}`.trim() || 'Ross Jermy',
       phone: customer.phone || '07841552355',
-      email: customer.email || 'ross.jermy@moovparcel.co.uk',
+      email: customer.email || 'ross.jermy@gmail.com',
       company_name: '',
       address_1: customer.address1 || '9 Mellor Meadows',
       address_2: customer.address2 || '',
@@ -181,7 +173,6 @@ export async function getPickupLocations(
       return { locations: MOCK_PICKUP_LOCATIONS, fromLive: false, error: data?.error || 'Failed to fetch pickup locations' };
     }
 
-    // Attach courier label to each returned location if missing
     const locationsWithCourier: PickupLocationItem[] = data.map((item: any) => ({
       ...item,
       pickupLocation: {
@@ -242,8 +233,8 @@ export async function getBillingQuote(
       ship_from: {
         name: "Ross Jermy",
         phone: "01111111111",
-        email: "ross@saas-ecommerce.com",
-        company_name: "Nino Logistics",
+        email: "ross.jermy@gmail.com",
+        company_name: "Logistics Hub",
         address_1: "2 Infirmary Street",
         address_2: "",
         address_3: "",
@@ -259,7 +250,7 @@ export async function getBillingQuote(
       ship_to: {
         name: `${customer.firstName} ${customer.lastName}`.trim() || "Ross Jermy",
         phone: customer.phone || "07841552355",
-        email: customer.email || "ross.jermy@moovparcel.co.uk",
+        email: customer.email || "ross.jermy@gmail.com",
         company_name: null,
         address_1: customer.address1 || "9 Mellor Meadows",
         address_2: customer.address2 || "Whittington",
@@ -278,13 +269,13 @@ export async function getBillingQuote(
           dim_unit: "cm",
           items: [
             {
-              description: "Moov Order Items",
+              description: "Order Items",
               origin_country: "GB",
               quantity: 1,
               value_currency: "GBP",
               weight: totalWeightKg,
               weight_unit: "KG",
-              sku: "MOOV-CART",
+              sku: "CART-ITEM-01",
               hs_code: "50000000",
               value: "143.00",
               extended_description: "Apparel and Accessories"
@@ -351,7 +342,6 @@ export async function getBillingQuote(
         }
       });
     } else if (data && typeof data === 'object') {
-      // Direct object response
       Object.keys(data).forEach(k => {
         if (typeof data[k] === 'number') {
           priceMap[k] = data[k];

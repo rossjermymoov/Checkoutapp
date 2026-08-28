@@ -4,7 +4,7 @@ import { DEFAULT_PRODUCTS, DEFAULT_CUSTOMER } from '../services/mockData';
 import { getBillingQuote, getPickupLocations, getCourierPresets } from '../services/api';
 import { SettingsStore } from './settingsStore';
 
-const CHECKOUT_STORAGE_KEY = 'moov_checkout_state_v1';
+const CHECKOUT_STORAGE_KEY = 'checkout_demo_state_v2';
 
 export class CheckoutStore {
   private static instance: CheckoutStore;
@@ -81,10 +81,10 @@ export class CheckoutStore {
 
   public applyCoupon(code: string): boolean {
     this.couponCode = code.trim().toUpperCase();
-    if (this.couponCode === 'MOOV10') {
+    if (this.couponCode === 'SAVE10' || this.couponCode === 'DEMO10') {
       this.discountAmount = 10;
     } else if (this.couponCode === 'FREESHIP') {
-      this.discountAmount = 0; // Handled in rate calculation
+      this.discountAmount = 0;
     } else if (this.couponCode === 'VIP20') {
       this.discountAmount = this.getSubtotal() * 0.2;
     } else {
@@ -103,7 +103,6 @@ export class CheckoutStore {
         this.selectedShipping = this.shippingRates[0];
       }
     } else {
-      // Pick default drop shop option if available
       if (this.pickupLocations.length > 0 && !this.selectedPickupLocation) {
         this.selectPickupLocation(this.pickupLocations[0]);
       }
@@ -161,7 +160,6 @@ export class CheckoutStore {
   }
 
   public getTax(): number {
-    // UK 20% VAT included in calculation
     return (this.getSubtotal() - this.discountAmount) * 0.2;
   }
 
@@ -172,31 +170,26 @@ export class CheckoutStore {
     return Math.max(0, subtotal - discount + shipping);
   }
 
-  // Fetch / Calculate shipping rates from API and Settings
   public async calculateRates() {
     const settings = SettingsStore.getInstance();
     this.isLoadingRates = true;
     this.notify();
 
     try {
-      // 1. Fetch live quotes from Billing API (or mock)
       const quoteRes = await getBillingQuote(this.customer, settings.credentials, this.getTotalWeightKg());
       const quotes = quoteRes.quotes;
 
       const subtotal = this.getSubtotal();
       const isFreeThresholdMet = settings.pricing.freeShippingThreshold !== null && subtotal >= settings.pricing.freeShippingThreshold;
 
-      // 2. Filter services enabled in settings and that belong to enabled couriers
       const enabledCourierKeys = new Set(settings.couriers.filter(c => c.enabled).map(c => c.key));
       const activeServices = settings.services.filter(
         (s) => s.enabled && !s.isDropShop && enabledCourierKeys.has(s.courier)
       );
 
-      // 3. Map into checkout options with markups & lead times
       const options: SelectedShippingOption[] = activeServices.map((service) => {
         let baseRate = service.priceOverride ?? quotes[service.dc_service_id] ?? settings.pricing.defaultFallbackRate;
 
-        // Apply pricing markup rule
         let finalRate = baseRate;
         if (settings.pricing.markupType === 'fixed') {
           finalRate += settings.pricing.markupValue;
@@ -204,7 +197,6 @@ export class CheckoutStore {
           finalRate = finalRate * (1 + settings.pricing.markupValue / 100);
         }
 
-        // Apply free shipping rule
         if (isFreeThresholdMet || this.couponCode === 'FREESHIP') {
           finalRate = 0;
         }
@@ -220,7 +212,6 @@ export class CheckoutStore {
         };
       });
 
-      // Sort by priority or price
       this.shippingRates = options;
       if (this.deliveryMode === 'courier' && (!this.selectedShipping || !options.find(o => o.serviceId === this.selectedShipping?.serviceId))) {
         this.selectedShipping = options[0] || null;
@@ -233,7 +224,6 @@ export class CheckoutStore {
     }
   }
 
-  // Fetch Pickup / Drop Shop locations
   public async loadPickupLocations() {
     const settings = SettingsStore.getInstance();
     if (!settings.dropShop.enabled) return;
@@ -242,7 +232,6 @@ export class CheckoutStore {
     this.notify();
 
     try {
-      // Query drop shop locations across enabled couriers
       const enabledCouriers = settings.dropShop.enabledCouriers;
       const allLocations: PickupLocationItem[] = [];
 
@@ -253,7 +242,6 @@ export class CheckoutStore {
         }
       }
 
-      // Filter by max radius & limit
       const filtered = allLocations
         .filter((loc) => loc.distance <= settings.dropShop.maxRadiusMiles)
         .slice(0, settings.dropShop.maxLocations);
@@ -273,7 +261,7 @@ export class CheckoutStore {
 
   public placeOrder(paymentMethod: string = 'Credit Card'): OrderConfirmation {
     const order: OrderConfirmation = {
-      orderNumber: `MOOV-${Math.floor(100000 + Math.random() * 900000)}`,
+      orderNumber: `ORD-${Math.floor(100000 + Math.random() * 900000)}`,
       createdAt: new Date().toLocaleDateString('en-GB', {
         day: 'numeric',
         month: 'short',

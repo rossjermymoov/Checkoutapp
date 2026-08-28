@@ -24,7 +24,6 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onProceedToShipping 
   };
 
   const handlePostcodeBlur = () => {
-    // When postcode changes, re-fetch rates and pickup locations
     checkout.calculateRates();
     checkout.loadPickupLocations();
   };
@@ -152,7 +151,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onProceedToShipping 
               type="email"
               value={customer.email}
               onChange={(e) => handleInputChange('email', e.target.value)}
-              placeholder="ross.jermy@moovparcel.co.uk"
+              placeholder="ross.jermy@gmail.com"
               className="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
             />
           </div>
@@ -164,7 +163,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onProceedToShipping 
               onChange={(e) => handleInputChange('marketingConsent', e.target.checked)}
               className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-gray-300"
             />
-            <span>Email me with news and exclusive Moov Parcel delivery offers</span>
+            <span>Email me with news and exclusive delivery offers</span>
           </label>
         </div>
       </div>

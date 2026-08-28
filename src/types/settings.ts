@@ -28,7 +28,7 @@ export interface ConfiguredService {
   enabled: boolean;
   priority: number;
   priceOverride?: number | null;
-  badgeText?: string;
+  badgeText?: string | null;
   isDropShop?: boolean;
 }
 

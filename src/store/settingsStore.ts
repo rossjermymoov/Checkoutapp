@@ -1,41 +1,44 @@
-import { ApiCredentials, CourierConfig, ConfiguredService, PricingRules, DropShopSettings, ApiLogEntry } from '../types/settings';
+import { ApiCredentials, ConfiguredService, CourierConfig, PricingRules, DropShopSettings } from '../types/settings';
+import { ApiLogEntry } from '../types/api';
 import { INITIAL_COURIERS, MOCK_PRESETS_BY_COURIER } from '../services/mockData';
 import { setApiLogListener } from '../services/api';
 
-const STORAGE_KEY = 'moov_settings_v1';
+const STORAGE_KEY = 'checkout_demo_settings_v2';
 
-// Initial default services from presets
 const INITIAL_SERVICES: ConfiguredService[] = [
   {
     dc_service_id: "DPD-NEXT-DAY",
     courier: "DPD",
     originalName: "DPD Next Day Standard",
-    displayName: "DPD Next Day Tracked",
+    displayName: "DPD Next Day Priority",
     leadTime: "Next Working Day (1-hr window)",
     enabled: true,
     priority: 1,
-    badgeText: "Most Popular",
+    isDropShop: false,
+    badgeText: "Fastest",
     priceOverride: null,
   },
   {
     dc_service_id: "DPD-12PM",
     courier: "DPD",
     originalName: "DPD Priority by 12:00 PM",
-    displayName: "DPD Express Priority (Before 12 PM)",
-    leadTime: "Tomorrow by 12:00 PM",
+    displayName: "DPD Express Pre-Noon",
+    leadTime: "Next Day before 12:00",
     enabled: true,
     priority: 2,
-    badgeText: "Fastest",
+    isDropShop: false,
+    badgeText: null,
     priceOverride: null,
   },
   {
     dc_service_id: "EVRI-STANDARD",
     courier: "Evri",
     originalName: "Evri Standard Tracked",
-    displayName: "Evri Tracked Delivery",
-    leadTime: "2-3 Working Days",
+    displayName: "Evri Standard Tracked",
+    leadTime: "2-3 Business Days",
     enabled: true,
     priority: 3,
+    isDropShop: false,
     badgeText: "Best Value",
     priceOverride: null,
   },
@@ -43,22 +46,24 @@ const INITIAL_SERVICES: ConfiguredService[] = [
     dc_service_id: "EVRI-NEXT-DAY",
     courier: "Evri",
     originalName: "Evri Next Day Delivery",
-    displayName: "Evri Next Day Delivery",
+    displayName: "Evri Next Day Tracked",
     leadTime: "Next Working Day",
     enabled: true,
     priority: 4,
-    badgeText: undefined,
+    isDropShop: false,
+    badgeText: null,
     priceOverride: null,
   },
   {
     dc_service_id: "UPS-STANDARD",
     courier: "UPS",
     originalName: "UPS Standard Ground",
-    displayName: "UPS Standard Ground",
+    displayName: "UPS Carbon Neutral Ground",
     leadTime: "1-2 Business Days",
     enabled: true,
     priority: 5,
-    badgeText: undefined,
+    isDropShop: false,
+    badgeText: null,
     priceOverride: null,
   },
   {
@@ -66,18 +71,19 @@ const INITIAL_SERVICES: ConfiguredService[] = [
     courier: "RoyalMail",
     originalName: "Royal Mail Tracked 24",
     displayName: "Royal Mail Tracked 24",
-    leadTime: "1 Working Day",
+    leadTime: "1-2 Days Guaranteed",
     enabled: true,
     priority: 6,
-    badgeText: undefined,
+    isDropShop: false,
+    badgeText: null,
     priceOverride: null,
   },
   {
     dc_service_id: "DPD-PICKUP",
     courier: "DPD",
     originalName: "DPD Pickup ParcelShop Collect",
-    displayName: "DPD Pickup Point Collection",
-    leadTime: "Next Day to Local ParcelShop",
+    displayName: "DPD Local ParcelShop Collection",
+    leadTime: "Next Day to Local Store",
     enabled: true,
     priority: 7,
     isDropShop: true,
@@ -99,20 +105,20 @@ const INITIAL_SERVICES: ConfiguredService[] = [
 ];
 
 const DEFAULT_CREDENTIALS: ApiCredentials = {
-  voilaApiUser: 'ross.jermy@moovparcel.co.uk',
+  voilaApiUser: 'ross.jermy@gmail.com',
   voilaApiToken: 'voila_live_sec_789412984102',
-  voilaAuthCompany: 'MoovParcel',
-  billingClientName: 'Moov Parcel',
+  voilaAuthCompany: 'Demo',
+  billingClientName: 'Demo Client',
   billingCustomerDcId: 'Kitloop',
   billingCustomerKey: 'b62e9045a42d43468840c6e07b568fcd',
   billingEndpointUrl: 'https://production.billingapi.co.uk/api/customer-routes/get-quote',
-  useLiveApi: false, // Default to mock for safety, toggleable with one click
+  useLiveApi: false,
 };
 
 const DEFAULT_PRICING: PricingRules = {
   markupType: 'none',
   markupValue: 0,
-  freeShippingThreshold: 150, // Free delivery above £150
+  freeShippingThreshold: 150,
   defaultFallbackRate: 4.95,
 };
 

@@ -26,7 +26,7 @@ export const CartSummary: React.FC = () => {
       setCouponInput('');
       checkout.calculateRates();
     } else {
-      setCouponError('Invalid coupon code. Try MOOV10 or FREESHIP');
+      setCouponError('Invalid coupon code. Try SAVE10 or FREESHIP');
     }
   };
 
@@ -37,10 +37,10 @@ export const CartSummary: React.FC = () => {
   const total = checkout.getTotal();
 
   return (
-    <div className="bg-white lg:bg-transparent rounded-2xl lg:rounded-none border lg:border-none border-gray-200 overflow-hidden shadow-sm lg:shadow-none">
+    <div className="bg-white lg:bg-transparent rounded-2xl lg:rounded-none border lg:border-none border-gray-200 shadow-sm lg:shadow-none">
       {/* Mobile Accordion Header */}
       <div
-        className="lg:hidden p-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between cursor-pointer"
+        className="lg:hidden p-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between cursor-pointer rounded-t-2xl"
         onClick={() => setIsMobileAccordionOpen(!isMobileAccordionOpen)}
       >
         <div className="flex items-center space-x-2 text-sm font-medium text-gray-900">
@@ -52,18 +52,18 @@ export const CartSummary: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className={`p-6 lg:p-0 ${isMobileAccordionOpen ? 'block' : 'hidden lg:block'} space-y-6`}>
+      <div className={`p-6 lg:p-0 ${isMobileAccordionOpen ? 'block' : 'hidden lg:block'} space-y-6 pt-3`}>
         {/* Product Items */}
-        <div className="space-y-4 divide-y divide-gray-100">
+        <div className="space-y-4 divide-y divide-gray-100 pt-1">
           {checkout.cart.map((item) => (
-            <div key={item.id} className="pt-4 first:pt-0 flex items-center justify-between gap-4">
-              <div className="relative flex-shrink-0">
+            <div key={item.id} className="pt-4 first:pt-2 flex items-center justify-between gap-4">
+              <div className="relative flex-shrink-0 pt-1 pr-1">
                 <img
                   src={item.image}
                   alt={item.name}
                   className="w-16 h-16 object-cover rounded-xl border border-gray-200 shadow-sm"
                 />
-                <span className="absolute -top-2 -right-2 bg-gray-600 text-white text-xs font-semibold w-5 h-5 rounded-full flex items-center justify-center shadow">
+                <span className="absolute top-0 right-0 transform translate-x-1/3 -translate-y-1/3 bg-gray-700 text-white text-[11px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-md z-10 border border-white">
                   {item.quantity}
                 </span>
               </div>
@@ -109,7 +109,7 @@ export const CartSummary: React.FC = () => {
               </div>
               <input
                 type="text"
-                placeholder="Discount code (try MOOV10)"
+                placeholder="Discount code (try SAVE10)"
                 value={couponInput}
                 onChange={(e) => setCouponInput(e.target.value)}
                 className="w-full pl-9 pr-3 py-2.5 bg-white border border-gray-300 rounded-xl text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
@@ -161,14 +161,7 @@ export const CartSummary: React.FC = () => {
           )}
 
           <div className="flex justify-between text-gray-600">
-            <span className="flex items-center gap-1.5">
-              Shipping
-              {checkout.selectedShipping && (
-                <span className="text-xs text-gray-400 font-normal truncate max-w-[150px]">
-                  ({checkout.selectedShipping.serviceName})
-                </span>
-              )}
-            </span>
+            <span>Shipping</span>
             <span className="font-medium text-gray-900">
               {shippingPrice === null ? (
                 <span className="text-xs text-gray-400">Calculated next</span>

@@ -1,22 +1,20 @@
 import React, { useState } from 'react';
-import { Key, ShieldCheck, Check, AlertCircle, RefreshCw, Server, Globe, Lock, Sliders } from 'lucide-react';
+import { Key, Shield, Check, RefreshCw, AlertCircle, Eye, EyeOff, Lock, Server } from 'lucide-react';
 import { SettingsStore } from '../../store/settingsStore';
+import { ApiCredentials } from '../../types/settings';
 import { getCourierPresets } from '../../services/api';
 
 export const CredentialsSettings: React.FC = () => {
   const settings = SettingsStore.getInstance();
-  const [, setTick] = useState(0);
-  const [testStatus, setTestStatus] = useState<{ loading: boolean; message?: string; success?: boolean }>({
+  const [credentials, setCredentials] = useState<ApiCredentials>(settings.credentials);
+  const [showTokens, setShowTokens] = useState<Record<string, boolean>>({});
+  const [testStatus, setTestStatus] = useState<{ loading: boolean; success?: boolean; message?: string }>({
     loading: false,
   });
 
-  React.useEffect(() => {
-    return settings.subscribe(() => setTick((t) => t + 1));
-  }, [settings]);
-
-  const credentials = settings.credentials;
-
-  const handleUpdate = (field: string, value: any) => {
+  const handleUpdate = (field: keyof ApiCredentials, value: any) => {
+    const updated = { ...credentials, [field]: value };
+    setCredentials(updated);
     settings.updateCredentials({ [field]: value });
   };
 
@@ -24,97 +22,73 @@ export const CredentialsSettings: React.FC = () => {
     setTestStatus({ loading: true });
     try {
       const res = await getCourierPresets('DPD', credentials);
-      if (res.error) {
+      if (res.fromLive) {
         setTestStatus({
           loading: false,
-          success: false,
-          message: `Connection returned: ${res.error}. Presets loaded via mock fallback.`,
+          success: true,
+          message: `Live Voila API Connection verified! Retrieved ${res.presets.length} DPD presets.`,
         });
       } else {
         setTestStatus({
           loading: false,
-          success: true,
-          message: `Connection successful! Fetched ${res.presets.length} presets for DPD (${res.fromLive ? 'Live Voila API' : 'Sandbox Mode'}).`,
+          success: false,
+          message: res.error || 'Could not connect to live API with these credentials. Using Sandbox / Mock data.',
         });
       }
-    } catch (err: any) {
+    } catch (e: any) {
       setTestStatus({
         loading: false,
         success: false,
-        message: `Failed: ${err.message}`,
+        message: e.message || 'API connection failed',
       });
     }
   };
 
+  const toggleShowToken = (field: string) => {
+    setShowTokens((prev) => ({ ...prev, [field]: !prev[field] }));
+  };
+
   return (
     <div className="space-y-6">
-      {/* Header & Mode Switch */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
+      {/* Overview Card */}
+      <div className="bg-gradient-to-r from-sky-50 to-indigo-50 border border-sky-100 rounded-2xl p-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+          <div className="space-y-1">
+            <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
               <Key className="w-5 h-5 text-sky-600" />
-              API Credentials & Endpoint Variables
+              API Credentials & Endpoints
             </h3>
-            <p className="text-xs text-gray-500 mt-1">
-              Configure authentication tokens and identifiers for HeyVoila and BillingAPI
+            <p className="text-xs text-gray-600 max-w-2xl">
+              Configure your credentials for HeyVoila Presets/PUDO and BillingAPI quoting. These values are injected into API proxy requests dynamically.
             </p>
           </div>
 
-          {/* Live vs Sandbox Switch */}
-          <div className="flex items-center space-x-3 bg-gray-50 p-2 rounded-xl border border-gray-200">
-            <span className="text-xs font-semibold text-gray-700">Execution Mode:</span>
+          <div className="flex items-center space-x-2">
+            <span className="text-xs font-semibold text-gray-700">Mode:</span>
             <button
               type="button"
-              onClick={() => handleUpdate('useLiveApi', false)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                !credentials.useLiveApi
-                  ? 'bg-amber-500 text-white shadow-xs'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Sandbox / Mock
-            </button>
-            <button
-              type="button"
-              onClick={() => handleUpdate('useLiveApi', true)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              onClick={() => handleUpdate('useLiveApi', !credentials.useLiveApi)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
                 credentials.useLiveApi
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                  : 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200'
               }`}
             >
-              Live API
+              {credentials.useLiveApi ? '● Live API Enabled' : '○ Mock / Sandbox Active'}
             </button>
           </div>
         </div>
-
-        {credentials.useLiveApi ? (
-          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center gap-2">
-            <Server className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-            <span>
-              <strong>Live Mode Active:</strong> Outgoing requests are proxied directly to <code className="bg-emerald-100 px-1 rounded">https://app.heyvoila.io</code> and <code className="bg-emerald-100 px-1 rounded">https://production.billingapi.co.uk</code>.
-            </span>
-          </div>
-        ) : (
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-amber-600 flex-shrink-0" />
-            <span>
-              <strong>Sandbox Mode Active:</strong> Simulates instant carrier responses matching exact Voila & BillingAPI schemas. Great for rapid prototyping and offline demos.
-            </span>
-          </div>
-        )}
       </div>
 
-      {/* HeyVoila API Credentials Box */}
+      {/* HeyVoila Credentials Box */}
       <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-5">
         <div className="flex items-center justify-between pb-3 border-b border-gray-100">
           <div>
             <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-              <Globe className="w-4 h-4 text-sky-600" />
-              HeyVoila API Credentials (<code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-700">app.heyvoila.io</code>)
+              <Shield className="w-4 h-4 text-sky-600" />
+              HeyVoila API Credentials (<code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-700">api.heyvoila.io</code>)
             </h4>
-            <p className="text-xs text-gray-500 mt-0.5">Used for Presets (`getServices`), Pickup Locations (`getLocations`), and Carrier Lists</p>
+            <p className="text-xs text-gray-500 mt-0.5">Used for retrieving courier service presets and Drop Shop / pickup locker locations</p>
           </div>
         </div>
 
@@ -127,7 +101,7 @@ export const CredentialsSettings: React.FC = () => {
               type="text"
               value={credentials.voilaApiUser}
               onChange={(e) => handleUpdate('voilaApiUser', e.target.value)}
-              placeholder="e.g. ross.jermy@moovparcel.co.uk"
+              placeholder="e.g. ross.jermy@gmail.com"
               className="w-full px-3.5 py-2 bg-gray-50/70 border border-gray-300 rounded-xl text-xs font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition-all"
             />
           </div>
@@ -153,7 +127,7 @@ export const CredentialsSettings: React.FC = () => {
               type="text"
               value={credentials.voilaAuthCompany}
               onChange={(e) => handleUpdate('voilaAuthCompany', e.target.value)}
-              placeholder="e.g. YTC / MoovParcel"
+              placeholder="e.g. DemoCompany / YTC"
               className="w-full px-3.5 py-2 bg-gray-50/70 border border-gray-300 rounded-xl text-xs font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition-all"
             />
           </div>
@@ -181,7 +155,7 @@ export const CredentialsSettings: React.FC = () => {
               type="text"
               value={credentials.billingClientName}
               onChange={(e) => handleUpdate('billingClientName', e.target.value)}
-              placeholder="Moov Parcel"
+              placeholder="e.g. Demo Client"
               className="w-full px-3.5 py-2 bg-gray-50/70 border border-gray-300 rounded-xl text-xs font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
             />
           </div>

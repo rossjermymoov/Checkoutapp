@@ -1,5 +1,5 @@
-import React from 'react';
-import { Truck, Clock, ShieldCheck, CheckCircle2, AlertCircle, RefreshCw, Sparkles } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Truck, Clock, CheckCircle2, ShieldCheck, RefreshCw, AlertCircle, Info } from 'lucide-react';
 import { CheckoutStore } from '../../store/checkoutStore';
 import { SettingsStore } from '../../store/settingsStore';
 import { SelectedShippingOption } from '../../types/checkout';
@@ -15,11 +15,13 @@ export const DeliverySelector: React.FC<DeliverySelectorProps> = ({
 }) => {
   const checkout = CheckoutStore.getInstance();
   const settings = SettingsStore.getInstance();
-  const [, setTick] = React.useState(0);
+  const [, setTick] = useState(0);
 
-  React.useEffect(() => {
-    // Calculate shipping rates when component mounts
-    checkout.calculateRates();
+  useEffect(() => {
+    // Automatically query rates if not calculated yet
+    if (checkout.shippingRates.length === 0) {
+      checkout.calculateRates();
+    }
     return checkout.subscribe(() => setTick((t) => t + 1));
   }, [checkout]);
 
@@ -37,7 +39,7 @@ export const DeliverySelector: React.FC<DeliverySelectorProps> = ({
     if (courierName.toLowerCase().includes('ups')) return 'https://app.heyvoila.io/courier-service-logos/ups.jpg';
     if (courierName.toLowerCase().includes('dhl')) return 'https://app.heyvoila.io/courier-service-logos/dhl.jpg';
     if (courierName.toLowerCase().includes('royal')) return 'https://app.heyvoila.io/courier-service-logos/royalmail.jpg';
-    return 'https://app.heyvoila.io/courier-service-logos/moov.jpg';
+    return 'https://app.heyvoila.io/courier-service-logos/dpd.jpg';
   };
 
   return (
@@ -151,7 +153,6 @@ export const DeliverySelector: React.FC<DeliverySelectorProps> = ({
                         alt={option.courier}
                         className="max-h-full max-w-full object-contain"
                         onError={(e) => {
-                          // Fallback letter badge
                           (e.currentTarget as HTMLElement).style.display = 'none';
                         }}
                       />

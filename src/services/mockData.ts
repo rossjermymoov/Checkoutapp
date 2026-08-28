@@ -4,9 +4,9 @@ import { OriginWarehouseAddress, CourierConfig } from '../types/settings';
 
 export const DEFAULT_WAREHOUSE: OriginWarehouseAddress = {
   name: "Ross Jermy",
-  company_name: "Nino Logistics",
+  company_name: "Logistics Hub",
   phone: "01111111111",
-  email: "ross@saas-ecommerce.com",
+  email: "ross.jermy@gmail.com",
   address_1: "2 Infirmary Street",
   address_2: "",
   city: "Leeds",
@@ -18,7 +18,7 @@ export const DEFAULT_WAREHOUSE: OriginWarehouseAddress = {
 };
 
 export const DEFAULT_CUSTOMER: CustomerDetails = {
-  email: "ross.jermy@moovparcel.co.uk",
+  email: "ross.jermy@gmail.com",
   firstName: "Ross",
   lastName: "Jermy",
   phone: "07841 552 355",
@@ -36,14 +36,14 @@ export const DEFAULT_CUSTOMER: CustomerDetails = {
 export const DEFAULT_PRODUCTS: CartProduct[] = [
   {
     id: "prod_1",
-    name: "Moov Voyager Commuter Backpack",
+    name: "Voyager Commuter Backpack",
     variant: "Matte Charcoal / 24L Weatherproof",
     price: 89.00,
     originalPrice: 110.00,
     image: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=400&q=80",
     quantity: 1,
     weightKg: 1.2,
-    sku: "MOOV-BP-001"
+    sku: "VOY-BP-001"
   },
   {
     id: "prod_2",
@@ -54,7 +54,7 @@ export const DEFAULT_PRODUCTS: CartProduct[] = [
     image: "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=400&q=80",
     quantity: 1,
     weightKg: 0.3,
-    sku: "MOOV-EAR-002"
+    sku: "AIR-EAR-002"
   }
 ];
 

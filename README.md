@@ -1,7 +1,7 @@
-# Moov Parcel Checkout & Carrier Management Platform 🚚📦
+# Checkout Demo & Carrier Management Platform 🚚📦
 
 A modern, high-performance checkout application with a dual-pronged architecture:
-1. **Frontend Customer Checkout GUI**: A sleek, Shopify-inspired checkout flow with dynamic carrier selection, live rate quoting, coupon codes, and an interactive **Drop Shop / PUDO (Pick Up Drop Off) map picker**.
+1. **Frontend Customer Checkout GUI**: A sleek checkout flow with dynamic carrier selection, live rate quoting, coupon codes, and an interactive **Drop Shop / PUDO (Pick Up Drop Off) map picker**.
 2. **Backend Merchant Settings Console**: A merchant control center to configure credentials (`api-user`, `api-token`, `auth_company`, `client_name`, `customer_dc_id`, `customer_key`), curate carrier routes, sync presets live from HeyVoila, apply pricing markups, and debug live requests in an **API Traffic Inspector**.
 
 ---
@@ -38,7 +38,6 @@ npm run dev
 ### 3. Production Build
 ```bash
 npm run build
-npm start
 ```
 
 ---

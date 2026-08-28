@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShoppingBag, Sliders, ShieldCheck, Zap, Server } from 'lucide-react';
+import { ShoppingBag, Sliders, ShieldCheck, Zap, Server, Package } from 'lucide-react';
 import { SettingsStore } from '../../store/settingsStore';
 
 interface HeaderProps {
@@ -27,17 +27,14 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
         <div className="flex items-center justify-between h-16">
           {/* Brand Logo & Name */}
           <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveTab('checkout')}>
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-600 to-cyan-500 flex items-center justify-center shadow-md shadow-sky-500/20 text-white font-bold text-xl tracking-wider">
-              M
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-600 to-cyan-500 flex items-center justify-center shadow-md shadow-sky-500/20 text-white font-bold text-xl">
+              <Package className="w-5 h-5 text-white" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <span className="text-xl font-bold tracking-tight text-gray-900">Moov Parcel</span>
-                <span className="text-xs bg-sky-100 text-sky-800 font-semibold px-2 py-0.5 rounded-full border border-sky-200">
-                  Checkout Demo
-                </span>
+                <span className="text-xl font-bold tracking-tight text-gray-900">Checkout Demo</span>
               </div>
-              <p className="text-xs text-gray-500 hidden sm:block">Intelligent Carrier & Drop Shop Logistics</p>
+              <p className="text-xs text-gray-500 hidden sm:block">Intelligent Carrier & Drop Shop Checkout</p>
             </div>
           </div>
 
