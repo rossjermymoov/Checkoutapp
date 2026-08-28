@@ -158,6 +158,43 @@ function apiProxyPlugin(): Plugin {
             return sendJsonResponse(upstreamRes.status, parsedData);
           }
 
+          // 5. Credentials persistence: /api/proxy/credentials
+          if (urlPath === '/api/proxy/credentials') {
+            const fs = await import('fs');
+            const path = await import('path');
+            const credFilePath = path.resolve(process.cwd(), 'credentials.json');
+
+            if (req.method === 'GET') {
+              if (fs.existsSync(credFilePath)) {
+                try {
+                  const data = JSON.parse(fs.readFileSync(credFilePath, 'utf8'));
+                  return sendJsonResponse(200, data);
+                } catch (e) {
+                  return sendJsonResponse(200, {});
+                }
+              }
+              return sendJsonResponse(200, {});
+            }
+
+            if (req.method === 'POST') {
+              const body = await readBody();
+              try {
+                let existing = {};
+                if (fs.existsSync(credFilePath)) {
+                  try {
+                    existing = JSON.parse(fs.readFileSync(credFilePath, 'utf8'));
+                  } catch (e) {}
+                }
+                const merged = { ...existing, ...body };
+                fs.writeFileSync(credFilePath, JSON.stringify(merged, null, 2), 'utf8');
+                console.log('[VITE PROXY] Persisted credentials to disk (credentials.json)');
+                return sendJsonResponse(200, { success: true, credentials: merged });
+              } catch (err: any) {
+                return sendJsonResponse(500, { error: err.message });
+              }
+            }
+          }
+
           // Fallback if route not matched
           return sendJsonResponse(404, { error: `Proxy route not found: ${urlPath}` });
         } catch (error: any) {

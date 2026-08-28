@@ -1,9 +1,10 @@
 import { ApiCredentials, ConfiguredService, CourierConfig, PricingRules, DropShopSettings } from '../types/settings';
 import { ApiLogEntry } from '../types/api';
-import { INITIAL_COURIERS, MOCK_PRESETS_BY_COURIER } from '../services/mockData';
+import { INITIAL_COURIERS } from '../services/mockData';
 import { setApiLogListener } from '../services/api';
 
 const STORAGE_KEY = 'checkout_demo_settings_v3';
+const PERMANENT_CREDENTIALS_KEY = 'checkout_demo_credentials_permanent';
 
 const INITIAL_SERVICES: ConfiguredService[] = [
   {
@@ -92,7 +93,7 @@ const INITIAL_SERVICES: ConfiguredService[] = [
   }
 ];
 
-const DEFAULT_CREDENTIALS: ApiCredentials = {
+export const DEFAULT_CREDENTIALS: ApiCredentials = {
   voilaApiUser: 'ross.jermy@gmail.com',
   voilaApiToken: 'voila_live_sec_789412984102',
   voilaAuthCompany: 'YTC',
@@ -117,6 +118,51 @@ const DEFAULT_DROPSHOP: DropShopSettings = {
   enabledCouriers: ['DPD', 'UPS', 'Yodel', 'InPost'],
 };
 
+// Helper to rescue credentials from any previous local storage keys
+function loadPersistedCredentials(): ApiCredentials {
+  let result = { ...DEFAULT_CREDENTIALS };
+
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return result;
+  }
+
+  // 1. Try permanent credentials store
+  try {
+    const permanent = localStorage.getItem(PERMANENT_CREDENTIALS_KEY);
+    if (permanent) {
+      const parsed = JSON.parse(permanent);
+      result = { ...result, ...parsed };
+      return result;
+    }
+  } catch (e) {}
+
+  // 2. Scan legacy keys
+  const legacyKeys = [
+    'checkout_demo_settings_v3',
+    'checkout_demo_settings_v2',
+    'checkout_demo_settings_v1',
+    'checkout_demo_settings',
+    'moov_checkout_settings'
+  ];
+
+  for (const key of legacyKeys) {
+    try {
+      const val = localStorage.getItem(key);
+      if (val) {
+        const parsed = JSON.parse(val);
+        if (parsed.credentials && Object.keys(parsed.credentials).length > 0) {
+          result = { ...result, ...parsed.credentials };
+          // Save to permanent key immediately
+          localStorage.setItem(PERMANENT_CREDENTIALS_KEY, JSON.stringify(result));
+          return result;
+        }
+      }
+    } catch (e) {}
+  }
+
+  return result;
+}
+
 export class SettingsStore {
   private static instance: SettingsStore;
   private subscribers = new Set<() => void>();
@@ -129,34 +175,61 @@ export class SettingsStore {
   public logs: ApiLogEntry[] = [];
 
   private constructor() {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    this.credentials = loadPersistedCredentials();
+    this.couriers = INITIAL_COURIERS;
+    this.services = INITIAL_SERVICES;
+    this.pricing = DEFAULT_PRICING;
+    this.dropShop = DEFAULT_DROPSHOP;
+
+    const saved = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        this.credentials = { ...DEFAULT_CREDENTIALS, ...(parsed.credentials || {}) };
+        if (parsed.credentials) {
+          this.credentials = { ...this.credentials, ...parsed.credentials };
+        }
         this.couriers = parsed.couriers || INITIAL_COURIERS;
         this.services = parsed.services || INITIAL_SERVICES;
         this.pricing = { ...DEFAULT_PRICING, ...(parsed.pricing || {}) };
         this.dropShop = { ...DEFAULT_DROPSHOP, ...(parsed.dropShop || {}) };
-      } catch (e) {
-        this.credentials = DEFAULT_CREDENTIALS;
-        this.couriers = INITIAL_COURIERS;
-        this.services = INITIAL_SERVICES;
-        this.pricing = DEFAULT_PRICING;
-        this.dropShop = DEFAULT_DROPSHOP;
-      }
-    } else {
-      this.credentials = DEFAULT_CREDENTIALS;
-      this.couriers = INITIAL_COURIERS;
-      this.services = INITIAL_SERVICES;
-      this.pricing = DEFAULT_PRICING;
-      this.dropShop = DEFAULT_DROPSHOP;
+      } catch (e) {}
     }
 
+    // Connect log listener
     setApiLogListener((entry) => {
       this.logs = [entry, ...this.logs.slice(0, 49)];
-      this.notify();
+      this.notify(false);
     });
+
+    // Sync with server disk credentials
+    this.syncWithServerCredentials();
+  }
+
+  private async syncWithServerCredentials() {
+    try {
+      const res = await fetch('/api/proxy/credentials');
+      if (res.ok) {
+        const serverCreds = await res.json();
+        if (serverCreds && Object.keys(serverCreds).length > 0) {
+          // Merge non-empty server credentials
+          let changed = false;
+          const merged = { ...this.credentials };
+          for (const [k, v] of Object.entries(serverCreds)) {
+            if (v !== undefined && v !== null && v !== '') {
+              if ((merged as any)[k] !== v) {
+                (merged as any)[k] = v;
+                changed = true;
+              }
+            }
+          }
+          if (changed) {
+            this.credentials = merged;
+            this.save();
+            this.subscribers.forEach((cb) => cb());
+          }
+        }
+      }
+    } catch (e) {}
   }
 
   public static getInstance(): SettingsStore {
@@ -171,12 +244,20 @@ export class SettingsStore {
     return () => this.subscribers.delete(cb);
   }
 
-  private notify() {
-    this.save();
+  private notify(triggerSave = true) {
+    if (triggerSave) {
+      this.save();
+    }
     this.subscribers.forEach((cb) => cb());
   }
 
   private save() {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+
+    // 1. Save credentials to permanent key
+    localStorage.setItem(PERMANENT_CREDENTIALS_KEY, JSON.stringify(this.credentials));
+
+    // 2. Save full settings
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
@@ -189,30 +270,39 @@ export class SettingsStore {
     );
   }
 
-  public updateCredentials(updates: Partial<ApiCredentials>) {
+  public async updateCredentials(updates: Partial<ApiCredentials>) {
     this.credentials = { ...this.credentials, ...updates };
-    this.notify();
+    this.notify(true);
+
+    // Persist to server disk as well
+    try {
+      await fetch('/api/proxy/credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(this.credentials),
+      });
+    } catch (e) {}
   }
 
   public toggleCourier(courierKey: string, enabled?: boolean) {
     this.couriers = this.couriers.map((c) =>
       c.key.toLowerCase() === courierKey.toLowerCase() ? { ...c, enabled: enabled !== undefined ? enabled : !c.enabled } : c
     );
-    this.notify();
+    this.notify(true);
   }
 
   public toggleService(serviceId: string, enabled?: boolean) {
     this.services = this.services.map((s) =>
       s.dc_service_id === serviceId ? { ...s, enabled: enabled !== undefined ? enabled : !s.enabled } : s
     );
-    this.notify();
+    this.notify(true);
   }
 
   public updateService(serviceId: string, updates: Partial<ConfiguredService>) {
     this.services = this.services.map((s) =>
       s.dc_service_id === serviceId ? { ...s, ...updates } : s
     );
-    this.notify();
+    this.notify(true);
   }
 
   public addServices(newServices: ConfiguredService[]) {
@@ -222,31 +312,36 @@ export class SettingsStore {
         this.services.push(s);
       }
     });
-    this.notify();
+    this.notify(true);
   }
 
   public updatePricing(updates: Partial<PricingRules>) {
     this.pricing = { ...this.pricing, ...updates };
-    this.notify();
+    this.notify(true);
   }
 
   public updateDropShop(updates: Partial<DropShopSettings>) {
     this.dropShop = { ...this.dropShop, ...updates };
-    this.notify();
+    this.notify(true);
   }
 
   public clearLogs() {
     this.logs = [];
-    this.notify();
+    this.subscribers.forEach((cb) => cb());
   }
 
-  public resetToDefaults() {
-    this.credentials = DEFAULT_CREDENTIALS;
+  public resetToDefaults(resetCredentials = false) {
+    if (resetCredentials) {
+      this.credentials = DEFAULT_CREDENTIALS;
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(PERMANENT_CREDENTIALS_KEY);
+      }
+    }
     this.couriers = INITIAL_COURIERS;
     this.services = INITIAL_SERVICES;
     this.pricing = DEFAULT_PRICING;
     this.dropShop = DEFAULT_DROPSHOP;
     this.logs = [];
-    this.notify();
+    this.notify(true);
   }
 }

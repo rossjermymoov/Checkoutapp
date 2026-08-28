@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Key, Shield, Check, RefreshCw, AlertCircle, Lock } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Key, Shield, Check, RefreshCw, AlertCircle, Lock, Save, Database } from 'lucide-react';
 import { SettingsStore } from '../../store/settingsStore';
 import { ApiCredentials } from '../../types/settings';
 import { getCourierPresets, getBillingQuote } from '../../services/api';
@@ -11,11 +11,26 @@ export const CredentialsSettings: React.FC = () => {
   const [testStatus, setTestStatus] = useState<{ loading: boolean; success?: boolean; message?: string }>({
     loading: false,
   });
+  const [savedFeedback, setSavedFeedback] = useState<boolean>(false);
+
+  useEffect(() => {
+    return settings.subscribe(() => {
+      setCredentials(settings.credentials);
+    });
+  }, [settings]);
 
   const handleUpdate = (field: keyof ApiCredentials, value: any) => {
     const updated = { ...credentials, [field]: value };
     setCredentials(updated);
     settings.updateCredentials({ [field]: value });
+    setSavedFeedback(true);
+    setTimeout(() => setSavedFeedback(false), 2500);
+  };
+
+  const handleManualSave = async () => {
+    await settings.updateCredentials(credentials);
+    setSavedFeedback(true);
+    setTimeout(() => setSavedFeedback(false), 2500);
   };
 
   const handleTestConnection = async () => {
@@ -71,7 +86,7 @@ export const CredentialsSettings: React.FC = () => {
               API Credentials & Endpoints
             </h3>
             <p className="text-xs text-gray-600 max-w-2xl">
-              Configure your credentials for HeyVoila Presets/PUDO and BillingAPI quoting. These values are injected into API proxy requests dynamically.
+              Configure your credentials for HeyVoila and BillingAPI. Credentials are permanently preserved in browser storage and persisted on the server.
             </p>
           </div>
 
@@ -111,7 +126,7 @@ export const CredentialsSettings: React.FC = () => {
             </label>
             <input
               type="text"
-              value={credentials.voilaApiUser}
+              value={credentials.voilaApiUser || ''}
               onChange={(e) => handleUpdate('voilaApiUser', e.target.value)}
               placeholder="e.g. ross.jermy@gmail.com"
               className="w-full px-3.5 py-2 bg-gray-50/70 border border-gray-300 rounded-xl text-xs font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition-all"
@@ -124,7 +139,7 @@ export const CredentialsSettings: React.FC = () => {
             </label>
             <input
               type="password"
-              value={credentials.voilaApiToken}
+              value={credentials.voilaApiToken || ''}
               onChange={(e) => handleUpdate('voilaApiToken', e.target.value)}
               placeholder="e.g. voila_sec_token"
               className="w-full px-3.5 py-2 bg-gray-50/70 border border-gray-300 rounded-xl text-xs font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition-all"
@@ -137,7 +152,7 @@ export const CredentialsSettings: React.FC = () => {
             </label>
             <input
               type="text"
-              value={credentials.voilaAuthCompany}
+              value={credentials.voilaAuthCompany || ''}
               onChange={(e) => handleUpdate('voilaAuthCompany', e.target.value)}
               placeholder="e.g. YTC"
               className="w-full px-3.5 py-2 bg-gray-50/70 border border-gray-300 rounded-xl text-xs font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition-all"
@@ -165,7 +180,7 @@ export const CredentialsSettings: React.FC = () => {
             </label>
             <input
               type="text"
-              value={credentials.billingClientName}
+              value={credentials.billingClientName || ''}
               onChange={(e) => handleUpdate('billingClientName', e.target.value)}
               placeholder="e.g. Moov Parcel"
               className="w-full px-3.5 py-2 bg-gray-50/70 border border-gray-300 rounded-xl text-xs font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
@@ -178,7 +193,7 @@ export const CredentialsSettings: React.FC = () => {
             </label>
             <input
               type="text"
-              value={credentials.billingCustomerDcId}
+              value={credentials.billingCustomerDcId || ''}
               onChange={(e) => handleUpdate('billingCustomerDcId', e.target.value)}
               placeholder="Kitloop"
               className="w-full px-3.5 py-2 bg-gray-50/70 border border-gray-300 rounded-xl text-xs font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
@@ -191,7 +206,7 @@ export const CredentialsSettings: React.FC = () => {
             </label>
             <input
               type="text"
-              value={credentials.billingCustomerKey}
+              value={credentials.billingCustomerKey || ''}
               onChange={(e) => handleUpdate('billingCustomerKey', e.target.value)}
               placeholder="b62e9045a42d43468840c6e07b568fcd"
               className="w-full px-3.5 py-2 bg-gray-50/70 border border-gray-300 rounded-xl text-xs font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
@@ -205,7 +220,7 @@ export const CredentialsSettings: React.FC = () => {
           </label>
           <input
             type="text"
-            value={credentials.billingEndpointUrl}
+            value={credentials.billingEndpointUrl || ''}
             onChange={(e) => handleUpdate('billingEndpointUrl', e.target.value)}
             placeholder="https://production.billingapi.co.uk/api/customer-routes/get-quote"
             className="w-full px-3.5 py-2 bg-gray-50/70 border border-gray-300 rounded-xl text-xs font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
@@ -216,26 +231,46 @@ export const CredentialsSettings: React.FC = () => {
       {/* Test Connection Button & Status */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white rounded-2xl border border-gray-200 p-4">
         <div className="flex items-center space-x-2 text-xs">
-          {testStatus.message && (
+          {savedFeedback && (
+            <div className="flex items-center gap-1.5 text-emerald-700 font-semibold animate-pulse">
+              <Database className="w-4 h-4 text-emerald-600" />
+              <span>Credentials saved to permanent storage!</span>
+            </div>
+          )}
+          {!savedFeedback && testStatus.message && (
             <div className={`flex items-center gap-1.5 ${testStatus.success ? 'text-emerald-700' : 'text-amber-700'}`}>
               {testStatus.success ? <Check className="w-4 h-4 text-emerald-600" /> : <AlertCircle className="w-4 h-4 text-amber-600" />}
               <span>{testStatus.message}</span>
             </div>
           )}
-          {!testStatus.message && (
-            <span className="text-gray-500">Test and verify your credentials with live endpoints</span>
+          {!savedFeedback && !testStatus.message && (
+            <div className="flex items-center gap-1.5 text-gray-500">
+              <Database className="w-3.5 h-3.5 text-sky-600" />
+              <span>Auto-saved to permanent storage & disk</span>
+            </div>
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={handleTestConnection}
-          disabled={testStatus.loading}
-          className="w-full sm:w-auto px-5 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center justify-center space-x-2 transition-all"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${testStatus.loading ? 'animate-spin' : ''}`} />
-          <span>Test API Connection</span>
-        </button>
+        <div className="flex items-center space-x-2 w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={handleManualSave}
+            className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center justify-center space-x-1.5 transition-all"
+          >
+            <Save className="w-3.5 h-3.5" />
+            <span>Save Credentials</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleTestConnection}
+            disabled={testStatus.loading}
+            className="px-4 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center justify-center space-x-1.5 transition-all"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${testStatus.loading ? 'animate-spin' : ''}`} />
+            <span>Test API</span>
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -1,11 +1,14 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const CRED_FILE = path.resolve(process.cwd(), 'credentials.json');
 
 app.use(cors());
 app.use(express.json());
@@ -43,6 +46,37 @@ async function handleUpstreamFetch(res, targetUrl, options) {
 // Health check
 app.get('/api/proxy/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Credentials persistence: GET & POST /api/proxy/credentials
+app.get('/api/proxy/credentials', (req, res) => {
+  if (fs.existsSync(CRED_FILE)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(CRED_FILE, 'utf8'));
+      return res.json(data);
+    } catch (e) {
+      return res.json({});
+    }
+  }
+  return res.json({});
+});
+
+app.post('/api/proxy/credentials', (req, res) => {
+  try {
+    let existing = {};
+    if (fs.existsSync(CRED_FILE)) {
+      try {
+        existing = JSON.parse(fs.readFileSync(CRED_FILE, 'utf8'));
+      } catch (e) {}
+    }
+    const merged = { ...existing, ...req.body };
+    fs.writeFileSync(CRED_FILE, JSON.stringify(merged, null, 2), 'utf8');
+    console.log('[PROXY] Persisted credentials to disk (credentials.json)');
+    return res.json({ success: true, credentials: merged });
+  } catch (err) {
+    console.error('[PROXY] Failed to persist credentials:', err);
+    return res.status(500).json({ error: err.message });
+  }
 });
 
 // 1. Get Presets / Services for a Courier (HeyVoila API)
