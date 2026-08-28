@@ -178,6 +178,77 @@ function toServiceMeta(preset: VoilaPreset): ServiceMeta {
   };
 }
 
+export interface DominanceCandidate {
+  serviceId: string;
+  serviceName: string;
+  courier: string;
+  price: number;
+  leadTimeDays?: number | null;
+  isDropShop?: boolean;
+}
+
+export interface DominanceResult<T extends DominanceCandidate> {
+  kept: T[];
+  hidden: Array<{ option: T; dominatedBy: T }>;
+}
+
+/**
+ * Remove services that another service FROM THE SAME COURIER beats on both
+ * speed and price.
+ *
+ * DPD Next Day at £5.00 and DPD 48 at £5.00 is a pointless choice: same money,
+ * slower. The 48-hour service is hidden. But if DPD 48 is cheaper it survives,
+ * because "slower but cheaper" is a real decision for the customer. And where
+ * Next Day is not quoted at all — Highlands, Northern Ireland — the 48-hour
+ * service is the only DPD option and is shown.
+ *
+ * Comparison is per courier and per delivery type: a cheap pickup-point service
+ * must not suppress a doorstep one, since they are different experiences.
+ *
+ * A service with no published transit time is never hidden and never hides
+ * anything, because "slower" cannot be established without both figures.
+ */
+export function removeDominatedOptions<T extends DominanceCandidate>(options: T[]): DominanceResult<T> {
+  const groupKey = (o: T) => `${normaliseCourier(o.courier).toLowerCase()}|${o.isDropShop ? 'pickup' : 'door'}`;
+
+  const dominates = (a: T, ai: number, b: T, bi: number): boolean => {
+    const aDays = a.leadTimeDays;
+    const bDays = b.leadTimeDays;
+    if (aDays == null || bDays == null) return false;
+    if (!(a.price <= b.price && aDays <= bDays)) return false;
+
+    // Strictly better on at least one axis wins outright.
+    if (a.price < b.price || aDays < bDays) return true;
+
+    // Identical on both axes: keep exactly one, deterministically, rather than
+    // letting the pair hide each other.
+    return ai < bi;
+  };
+
+  const kept: T[] = [];
+  const hidden: Array<{ option: T; dominatedBy: T }> = [];
+
+  options.forEach((option, i) => {
+    const key = groupKey(option);
+    let dominator: T | null = null;
+
+    for (let j = 0; j < options.length; j++) {
+      if (j === i) continue;
+      const other = options[j];
+      if (groupKey(other) !== key) continue;
+      if (dominates(other, j, option, i)) {
+        dominator = other;
+        break;
+      }
+    }
+
+    if (dominator) hidden.push({ option, dominatedBy: dominator });
+    else kept.push(option);
+  });
+
+  return { kept, hidden };
+}
+
 export type ServiceCatalogue = Map<string, ServiceMeta>;
 
 /** Index a preset list by dc_service_id. Exported so it can be tested directly. */

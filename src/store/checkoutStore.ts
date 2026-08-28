@@ -2,7 +2,12 @@ import { CartProduct, CustomerDetails, SelectedShippingOption, OrderConfirmation
 import { PickupLocationItem, QuotedService } from '../types/api';
 import { DEFAULT_PRODUCTS, DEFAULT_CUSTOMER } from '../services/mockData';
 import { getBillingQuote, getPickupLocations } from '../services/api';
-import { getServiceCatalogue, normaliseCourier, checkWeightEligibility } from '../services/serviceCatalogue';
+import {
+  getServiceCatalogue,
+  normaliseCourier,
+  checkWeightEligibility,
+  removeDominatedOptions,
+} from '../services/serviceCatalogue';
 import { applyPricingRules, AppliedRule } from '../services/pricingRules';
 import { SettingsStore } from './settingsStore';
 
@@ -357,14 +362,32 @@ export class CheckoutStore {
           return da !== db ? da - db : a.price - b.price;
         });
 
+      // Hide a service when another from the SAME courier is both at least as
+      // fast and at least as cheap — DPD Next Day at £5.00 makes DPD 48 at
+      // £5.00 a pointless choice. Applied after pricing rules, so the
+      // comparison uses the prices the customer would actually pay.
+      let finalOptions = options;
+      if (settings.hideDominatedServices) {
+        const { kept, hidden } = removeDominatedOptions(options);
+        finalOptions = kept;
+        hidden.forEach(({ option, dominatedBy }) => {
+          const sameCost = option.price === dominatedBy.price;
+          notices.push(
+            `${option.serviceName} hidden — ${dominatedBy.serviceName} is ${
+              sameCost ? 'the same price' : `£${(option.price - dominatedBy.price).toFixed(2)} cheaper`
+            } and arrives sooner`
+          );
+        });
+      }
+
       this.unavailableNotices = notices;
 
       // Doorstep and pickup-point services are the same quoted services split by
       // the merchant's own classification. A pickup point is not a product in
       // its own right — it is a destination for one of these services, and it
       // is priced at that service's quoted rate.
-      this.shippingRates = options.filter((o) => !o.isDropShop);
-      this.dropShopRates = options.filter((o) => o.isDropShop);
+      this.shippingRates = finalOptions.filter((o) => !o.isDropShop);
+      this.dropShopRates = finalOptions.filter((o) => o.isDropShop);
 
       if (
         this.deliveryMode === 'courier' &&

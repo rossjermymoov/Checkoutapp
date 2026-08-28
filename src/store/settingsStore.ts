@@ -217,6 +217,12 @@ export class SettingsStore {
   public services: ConfiguredService[];
   public pricingRules: PricingRule[];
   public dropShop: DropShopSettings;
+  /**
+   * Hide a service when another from the same courier is both at least as fast
+   * and at least as cheap. On by default — showing a slower service at the same
+   * money is a choice with no upside.
+   */
+  public hideDominatedServices: boolean = true;
   public logs: ApiLogEntry[] = [];
 
   private constructor() {
@@ -238,6 +244,9 @@ export class SettingsStore {
         this.services = Array.isArray(parsed.services) ? parsed.services : INITIAL_SERVICES;
         if (Array.isArray(parsed.pricingRules)) this.pricingRules = parsed.pricingRules;
         this.dropShop = { ...DEFAULT_DROPSHOP, ...(parsed.dropShop || {}) };
+        if (typeof parsed.hideDominatedServices === 'boolean') {
+          this.hideDominatedServices = parsed.hideDominatedServices;
+        }
         // Ensure dropShop enabledCouriers doesn't include InPost
         this.dropShop.enabledCouriers = this.dropShop.enabledCouriers.filter((c) => c !== 'InPost');
       } catch (e) {}
@@ -315,6 +324,7 @@ export class SettingsStore {
         services: this.services,
         pricingRules: this.pricingRules,
         dropShop: this.dropShop,
+        hideDominatedServices: this.hideDominatedServices,
       })
     );
   }
@@ -407,6 +417,11 @@ export class SettingsStore {
     const next = [...this.pricingRules];
     [next[idx], next[target]] = [next[target], next[idx]];
     this.pricingRules = next;
+    this.notify(true);
+  }
+
+  public setHideDominatedServices(value: boolean) {
+    this.hideDominatedServices = value;
     this.notify(true);
   }
 

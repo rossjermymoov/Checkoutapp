@@ -162,6 +162,23 @@ export const ServiceCatalogue: React.FC = () => {
         </div>
       )}
 
+      {/* Display policy */}
+      <label className="flex items-start gap-2.5 p-3 bg-white border border-gray-200 rounded-xl cursor-pointer">
+        <input
+          type="checkbox"
+          checked={settings.hideDominatedServices}
+          onChange={(e) => settings.setHideDominatedServices(e.target.checked)}
+          className="w-4 h-4 rounded accent-emerald-600 mt-0.5"
+        />
+        <span className="text-xs text-gray-700">
+          <span className="font-semibold text-gray-900 block">Hide services beaten on both speed and price</span>
+          When one service from a courier is at least as fast and at least as cheap as another from the same courier,
+          only the better one is shown — DPD Next Day at £5.00 hides DPD 48 at £5.00. A slower service that is genuinely
+          cheaper is still offered, and where the faster one is not quoted (Highlands, Northern Ireland) the slower one
+          is the only option and appears.
+        </span>
+      </label>
+
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[200px]">
