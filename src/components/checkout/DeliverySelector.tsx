@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Truck, Clock, CheckCircle2, ShieldCheck, RefreshCw, AlertCircle, Info } from 'lucide-react';
+import { Truck, Clock, CheckCircle2, RefreshCw, AlertCircle, Info, Leaf, ChevronRight } from 'lucide-react';
 import { CheckoutStore } from '../../store/checkoutStore';
 import { SettingsStore } from '../../store/settingsStore';
 import { SelectedShippingOption } from '../../types/checkout';
@@ -32,6 +32,20 @@ export const DeliverySelector: React.FC<DeliverySelectorProps> = ({
   const leadDays = rates.map((r) => r.leadTimeDays).filter((d): d is number => d != null);
   const fastestDays = leadDays.length > 0 ? Math.min(...leadDays) : null;
   const cheapestPrice = rates.length > 0 ? Math.min(...rates.map((r) => r.price)) : null;
+
+  // Is a pickup point actually cheaper than the doorstep option in front of the
+  // customer? Compared against what they have selected, or the cheapest
+  // doorstep rate if nothing is selected yet. No saving, no banner.
+  const pickupSaving = (() => {
+    const pickups = checkout.dropShopRates;
+    if (pickups.length === 0 || rates.length === 0) return null;
+    const cheapestPickup = Math.min(...pickups.map((r) => r.price));
+    const compareAgainst = selected && !selected.isDropShop ? selected.price : cheapestPrice;
+    if (compareAgainst == null) return null;
+    const saving = Number((compareAgainst - cheapestPickup).toFixed(2));
+    if (saving <= 0) return null;
+    return { cheapest: cheapestPickup, saving };
+  })();
 
   const getCourierLogo = (courierName: string) => {
     const courier = settings.couriers.find(
@@ -133,16 +147,39 @@ export const DeliverySelector: React.FC<DeliverySelectorProps> = ({
         </div>
       )}
 
-      {/* Services excluded by a rule, with the reason */}
-      {!isLoading && checkout.unavailableNotices.length > 0 && (
-        <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600 space-y-1">
-          {checkout.unavailableNotices.map((notice, i) => (
-            <p key={i} className="flex items-start gap-1.5">
-              <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-gray-400" />
-              <span>{notice}</span>
-            </p>
-          ))}
-        </div>
+      {/* Merchant diagnostics — "quoted but not selected", weight exclusions —
+          deliberately do NOT appear here. They are configuration information for
+          the merchant, not something a shopper should read, and they leak which
+          services the account carries. They appear in Settings → Service Catalogue. */}
+
+      {/* Pickup-point nudge. Only shown when a pickup option is genuinely
+          cheaper than what the customer is currently looking at — the saving is
+          computed from live quotes, never asserted. */}
+      {!isLoading && pickupSaving && (
+        <button
+          onClick={() => checkout.setDeliveryMode('drop_shop')}
+          className="w-full text-left p-4 bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100/70 hover:border-emerald-300 transition-all group"
+        >
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center flex-shrink-0">
+              <Leaf className="w-4 h-4 text-white" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-emerald-900">
+                Collect from a local shop or locker and pay {pickupSaving.cheapest === 0 ? 'nothing' : `as little as £${pickupSaving.cheapest.toFixed(2)}`}
+              </p>
+              <p className="text-xs text-emerald-800 mt-0.5">
+                That's <strong>£{pickupSaving.saving.toFixed(2)} less</strong> than your current choice. Collection
+                points group deliveries onto fewer trips and avoid repeat visits when you're out, so they cut the miles
+                driven per parcel.
+              </p>
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 mt-2 group-hover:gap-2 transition-all">
+                Choose a collection point
+                <ChevronRight className="w-3.5 h-3.5" />
+              </span>
+            </div>
+          </div>
+        </button>
       )}
 
       {/* Empty State */}
@@ -220,15 +257,17 @@ export const DeliverySelector: React.FC<DeliverySelectorProps> = ({
                           {option.serviceName}
                         </span>
                         {/* Badges derive from the live quote and Voila's published
-                            transit time, not from guessing at service ID strings. */}
-                        {option.leadTimeDays != null && option.leadTimeDays === fastestDays && rates.length > 1 && (
-                          <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200">
-                            Fastest
+                            transit time, not from guessing at service ID strings.
+                            They are independent: a service that is both the
+                            cheapest and the fastest earns both badges. */}
+                        {rates.length > 1 && option.price === cheapestPrice && (
+                          <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            Cheapest
                           </span>
                         )}
-                        {option.price === cheapestPrice && option.leadTimeDays !== fastestDays && rates.length > 1 && (
-                          <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                            Best Value
+                        {rates.length > 1 && option.leadTimeDays != null && option.leadTimeDays === fastestDays && (
+                          <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 border border-sky-200">
+                            Fastest
                           </span>
                         )}
                       </div>

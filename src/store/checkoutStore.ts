@@ -3,6 +3,7 @@ import { PickupLocationItem, QuotedService } from '../types/api';
 import { DEFAULT_PRODUCTS, DEFAULT_CUSTOMER } from '../services/mockData';
 import { getBillingQuote, getPickupLocations } from '../services/api';
 import { getServiceCatalogue, normaliseCourier, checkWeightEligibility } from '../services/serviceCatalogue';
+import { applyPricingRules, AppliedRule } from '../services/pricingRules';
 import { SettingsStore } from './settingsStore';
 
 const CHECKOUT_STORAGE_KEY = 'checkout_demo_state_v2';
@@ -31,6 +32,8 @@ export class CheckoutStore {
   public unavailableNotices: string[] = [];
   /** Per-courier drop shop failures, e.g. UPS not enabled on the Voila account. */
   public dropShopErrors: Record<string, string> = {};
+  /** Which pricing rules fired for each service, so a price is explainable. */
+  public appliedPricingRules: Record<string, AppliedRule[]> = {};
   public couponCode: string = '';
   public discountAmount: number = 0;
   public step: 'information' | 'shipping' | 'payment' | 'confirmation' = 'information';
@@ -140,8 +143,6 @@ export class CheckoutStore {
 
   public selectPickupLocation(location: PickupLocationItem) {
     this.selectedPickupLocation = location;
-    const settings = SettingsStore.getInstance();
-    const isFree = settings.pricing.freeShippingThreshold && this.getSubtotal() >= settings.pricing.freeShippingThreshold;
     const org = location.pickupLocation.address?.organisation || location.pickupLocation.shortName || 'Drop Shop';
 
     // Price comes from the carrier's own quote for the drop-off service, not a
@@ -157,8 +158,10 @@ export class CheckoutStore {
       return;
     }
 
+    // service.price has already been through the rule pipeline in
+    // calculateRates, so it is not re-applied here.
     const basePrice = service.price;
-    const finalPrice = isFree || this.couponCode === 'FREESHIP' ? 0 : basePrice;
+    const finalPrice = this.couponCode === 'FREESHIP' ? 0 : basePrice;
 
     this.selectedShipping = {
       type: 'drop_shop',
@@ -228,6 +231,7 @@ export class CheckoutStore {
     this.isLoadingRates = true;
     this.ratesError = null;
     this.unavailableNotices = [];
+    this.appliedPricingRules = {};
     this.notify();
 
     try {
@@ -264,10 +268,6 @@ export class CheckoutStore {
               };
             })
         : quoteRes.services;
-      const subtotal = this.getSubtotal();
-      const isFreeThresholdMet =
-        settings.pricing.freeShippingThreshold !== null && subtotal >= settings.pricing.freeShippingThreshold;
-
       // The merchant console decorates and may suppress; it no longer decides
       // what exists. Match its entries to quoted services by dc_service_id.
       const overrides = new Map(settings.services.map((s) => [s.dc_service_id, s]));
@@ -308,17 +308,21 @@ export class CheckoutStore {
         })
         .map(({ quoted, meta, override, courier }) => {
           const baseRate = override?.priceOverride ?? quoted.price;
+          const isDropShop = Boolean(override?.isDropShop);
 
-          let finalRate = baseRate;
-          if (settings.pricing.markupType === 'fixed') {
-            finalRate += settings.pricing.markupValue;
-          } else if (settings.pricing.markupType === 'percentage') {
-            finalRate = finalRate * (1 + settings.pricing.markupValue / 100);
-          }
+          // The merchant's rule pipeline transforms the carrier's quote.
+          // With no rules configured the quote passes through untouched.
+          const { price: ruledPrice, applied } = applyPricingRules(baseRate, settings.pricingRules, {
+            courier,
+            serviceId: quoted.code,
+            countryIso: this.customer.countryIso || 'GB',
+            orderValue: this.getSubtotal(),
+            weightKg: totalWeight,
+            isDropShop,
+          });
 
-          if (isFreeThresholdMet || this.couponCode === 'FREESHIP') {
-            finalRate = 0;
-          }
+          const finalRate = this.couponCode === 'FREESHIP' ? 0 : ruledPrice;
+          this.appliedPricingRules[quoted.code] = applied;
 
           return {
             type: 'courier' as const,
@@ -328,7 +332,7 @@ export class CheckoutStore {
             // Transit time comes from Voila, not from a hardcoded string.
             leadTime: meta?.leadTime.label || 'Delivery time confirmed at dispatch',
             leadTimeDays: meta?.leadTime.days ?? null,
-            isDropShop: Boolean(override?.isDropShop),
+            isDropShop,
             price: Number(finalRate.toFixed(2)),
             originalPrice: Number(baseRate.toFixed(2)),
           };

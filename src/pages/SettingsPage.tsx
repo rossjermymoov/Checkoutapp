@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sliders, Key, PackageCheck, DollarSign, MapPin, Terminal, RotateCcw, Check, Sparkles, Server, Layers } from 'lucide-react';
+import { Sliders, Key, PackageCheck, PoundSterling, MapPin, Terminal, RotateCcw, Check, Sparkles, Server, Layers } from 'lucide-react';
 import { SettingsStore } from '../store/settingsStore';
 import { CredentialsSettings } from '../components/admin/CredentialsSettings';
 import { ServiceManager } from '../components/admin/ServiceManager';
@@ -113,7 +113,7 @@ export const SettingsPage: React.FC = () => {
                 : 'bg-white hover:bg-gray-100 text-gray-700 border border-gray-200'
             }`}
           >
-            <DollarSign className="w-3.5 h-3.5" />
+            <PoundSterling className="w-3.5 h-3.5" />
             <span>Pricing Rules & Markups</span>
           </button>
 

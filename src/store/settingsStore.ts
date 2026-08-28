@@ -1,4 +1,4 @@
-import { ApiCredentials, ConfiguredService, CourierConfig, PricingRules, DropShopSettings } from '../types/settings';
+import { ApiCredentials, ConfiguredService, CourierConfig, PricingRule, DropShopSettings } from '../types/settings';
 import { ApiLogEntry } from '../types/api';
 import { INITIAL_COURIERS } from '../services/mockData';
 import { setApiLogListener } from '../services/api';
@@ -6,7 +6,9 @@ import { setApiLogListener } from '../services/api';
 // v4: the fictional default services (UPS-STANDARD, DPD-NEXT-DAY,
 // DPD-PICKUP, UPS-ACCESS-POINT) were removed. Bumping the key stops them
 // being resurrected from a browser that still holds the old list.
-const STORAGE_KEY = 'checkout_demo_settings_v4';
+// v5: single markupType/markupValue/freeShippingThreshold replaced by an
+// ordered list of pricing rules.
+const STORAGE_KEY = 'checkout_demo_settings_v5';
 const PERMANENT_CREDENTIALS_KEY = 'checkout_demo_credentials_permanent';
 
 /**
@@ -31,11 +33,8 @@ export const DEFAULT_CREDENTIALS: ApiCredentials = {
   useLiveApi: true,
 };
 
-const DEFAULT_PRICING: PricingRules = {
-  markupType: 'none',
-  markupValue: 0,
-  freeShippingThreshold: 150,
-};
+/** No rules means the carrier's quote passes through untouched. */
+const DEFAULT_PRICING_RULES: PricingRule[] = [];
 
 const DEFAULT_DROPSHOP: DropShopSettings = {
   enabled: true,
@@ -100,7 +99,7 @@ export class SettingsStore {
   public credentials: ApiCredentials;
   public couriers: CourierConfig[];
   public services: ConfiguredService[];
-  public pricing: PricingRules;
+  public pricingRules: PricingRule[];
   public dropShop: DropShopSettings;
   public logs: ApiLogEntry[] = [];
 
@@ -108,7 +107,7 @@ export class SettingsStore {
     this.credentials = loadPersistedCredentials();
     this.couriers = INITIAL_COURIERS;
     this.services = INITIAL_SERVICES;
-    this.pricing = DEFAULT_PRICING;
+    this.pricingRules = [...DEFAULT_PRICING_RULES];
     this.dropShop = DEFAULT_DROPSHOP;
 
     const saved = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
@@ -122,7 +121,7 @@ export class SettingsStore {
         // Cleanse services to remove InPost or other disabled/non-existent couriers
         const loadedServices: ConfiguredService[] = parsed.services || INITIAL_SERVICES;
         this.services = loadedServices.filter((s) => s.courier !== 'InPost');
-        this.pricing = { ...DEFAULT_PRICING, ...(parsed.pricing || {}) };
+        if (Array.isArray(parsed.pricingRules)) this.pricingRules = parsed.pricingRules;
         this.dropShop = { ...DEFAULT_DROPSHOP, ...(parsed.dropShop || {}) };
         // Ensure dropShop enabledCouriers doesn't include InPost
         this.dropShop.enabledCouriers = this.dropShop.enabledCouriers.filter((c) => c !== 'InPost');
@@ -198,7 +197,7 @@ export class SettingsStore {
         credentials: this.credentials,
         couriers: this.couriers,
         services: this.services,
-        pricing: this.pricing,
+        pricingRules: this.pricingRules,
         dropShop: this.dropShop,
       })
     );
@@ -264,8 +263,34 @@ export class SettingsStore {
     this.notify(true);
   }
 
-  public updatePricing(updates: Partial<PricingRules>) {
-    this.pricing = { ...this.pricing, ...updates };
+  public setPricingRules(rules: PricingRule[]) {
+    this.pricingRules = rules;
+    this.notify(true);
+  }
+
+  public addPricingRule(rule: PricingRule) {
+    this.pricingRules = [...this.pricingRules, rule];
+    this.notify(true);
+  }
+
+  public updatePricingRule(id: string, updates: Partial<PricingRule>) {
+    this.pricingRules = this.pricingRules.map((r) => (r.id === id ? { ...r, ...updates } : r));
+    this.notify(true);
+  }
+
+  public deletePricingRule(id: string) {
+    this.pricingRules = this.pricingRules.filter((r) => r.id !== id);
+    this.notify(true);
+  }
+
+  /** Order is significant — rounding rules generally belong last. */
+  public movePricingRule(id: string, direction: -1 | 1) {
+    const idx = this.pricingRules.findIndex((r) => r.id === id);
+    const target = idx + direction;
+    if (idx < 0 || target < 0 || target >= this.pricingRules.length) return;
+    const next = [...this.pricingRules];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    this.pricingRules = next;
     this.notify(true);
   }
 
@@ -288,7 +313,7 @@ export class SettingsStore {
     }
     this.couriers = INITIAL_COURIERS;
     this.services = INITIAL_SERVICES;
-    this.pricing = DEFAULT_PRICING;
+    this.pricingRules = [...DEFAULT_PRICING_RULES];
     this.dropShop = DEFAULT_DROPSHOP;
     this.logs = [];
     this.notify(true);

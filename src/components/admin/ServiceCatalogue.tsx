@@ -12,6 +12,7 @@ import {
   Ban,
 } from 'lucide-react';
 import { SettingsStore } from '../../store/settingsStore';
+import { CheckoutStore } from '../../store/checkoutStore';
 import { getServiceCatalogue, ServiceMeta } from '../../services/serviceCatalogue';
 import { ConfiguredService } from '../../types/settings';
 
@@ -30,7 +31,11 @@ export const ServiceCatalogue: React.FC = () => {
   const [courierFilter, setCourierFilter] = useState<string>('all');
   const [showSelectedOnly, setShowSelectedOnly] = useState(false);
 
+  const checkout = CheckoutStore.getInstance();
+  const checkoutNotices = checkout.unavailableNotices;
+
   useEffect(() => settings.subscribe(() => setTick((t) => t + 1)), [settings]);
+  useEffect(() => checkout.subscribe(() => setTick((t) => t + 1)), [checkout]);
 
   const load = useCallback(
     async (force = false) => {
@@ -141,6 +146,19 @@ export const ServiceCatalogue: React.FC = () => {
         <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg flex items-start gap-2 text-xs text-rose-800">
           <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-600 mt-0.5" />
           <span>{error}</span>
+        </div>
+      )}
+
+      {/* Merchant-only diagnostics. These belong here, not on the checkout page
+          where a shopper would read them. */}
+      {checkoutNotices.length > 0 && (
+        <div className="p-3 bg-sky-50 border border-sky-200 rounded-lg text-xs text-sky-900 space-y-1">
+          <p className="font-semibold">From the last checkout quote</p>
+          {checkoutNotices.map((n, i) => (
+            <p key={i} className="text-sky-800">
+              {n}
+            </p>
+          ))}
         </div>
       )}
 
