@@ -380,6 +380,22 @@ export class CheckoutStore {
         });
       }
 
+      // The reverse diagnostic: services the merchant selected that the Billing
+      // API did not price for this address. Without this, a merchant who has
+      // ticked twenty services and sees two has nothing to tell them why.
+      if (!isSandbox) {
+        const quotedCodes = new Set(quotedServices.map((q) => q.code));
+        settings.services
+          .filter((svc) => svc.enabled && !quotedCodes.has(svc.dc_service_id))
+          .forEach((svc) => {
+            notices.push(
+              `${svc.displayName || svc.dc_service_id} is selected but was not quoted for ${
+                this.customer.postcode || 'this address'
+              } — the Billing API has no price configured for it, or its rules exclude this destination`
+            );
+          });
+      }
+
       this.unavailableNotices = notices;
 
       // Doorstep and pickup-point services are the same quoted services split by

@@ -217,12 +217,16 @@ export function removeDominatedOptions<T extends DominanceCandidate>(options: T[
     if (aDays == null || bDays == null) return false;
     if (!(a.price <= b.price && aDays <= bDays)) return false;
 
-    // Strictly better on at least one axis wins outright.
-    if (a.price < b.price || aDays < bDays) return true;
-
-    // Identical on both axes: keep exactly one, deterministically, rather than
-    // letting the pair hide each other.
-    return ai < bi;
+    // Must be strictly better on at least one axis.
+    //
+    // A tie on BOTH axes does not hide anything. Voila's lead_time is a coarse
+    // bucket — 21 of this account's DPD services all report "Next Day",
+    // including DPD Saturday, DPD Sunday, DPD Next Day 10.30 and DPD Next Day
+    // 12.00. Those differ in ways lead_time cannot express, and a customer
+    // choosing Saturday delivery wants Saturday, not "something else that also
+    // takes one day". Collapsing equals would have silently deleted twenty of
+    // them behind whichever happened to sort first.
+    return a.price < b.price || aDays < bDays;
   };
 
   const kept: T[] = [];
