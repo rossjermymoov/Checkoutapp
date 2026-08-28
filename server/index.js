@@ -45,15 +45,27 @@ app.use((req, res, next) => {
 // ---------------------------------------------------------------------------
 // Tenants (per-customer demo links)
 // ---------------------------------------------------------------------------
-// CHECKOUT_TENANTS_JSON holds every customer keyed by slug:
+// A customer link needs NO configuration. /c/<slug> works immediately: the name
+// is derived from the slug and the shared CHECKOUT_SETTINGS_JSON is used, so
+// adding a customer means sending them a URL and nothing else.
 //
-//   { "acme": { "name": "Acme Retail",
-//               "settings": { ...exported configuration... },
+// CHECKOUT_TENANTS_JSON is optional, only for the exceptions — a display name
+// that does not fall out of the slug ("acme-uk" -> "Acme UK"), or a customer
+// quoted against their own carrier account:
+//
+//   { "acme": { "name": "ACME (UK) Ltd",
 //               "credentials": { "billingCustomerDcId": "AcmeDC", ... } } }
 //
-// The credentials block is optional and NEVER leaves this process — it exists so
-// customers can be quoted against their own carrier account. Everything else is
-// public to whoever holds the link.
+// The credentials block NEVER leaves this process.
+
+/** "acme-retail" -> "Acme Retail". Good enough for a demonstrator's header. */
+function nameFromSlug(slug) {
+  return String(slug || '')
+    .split('-')
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
 
 function readTenants() {
   const raw = process.env.CHECKOUT_TENANTS_JSON;
@@ -260,16 +272,31 @@ app.get('/api/proxy/settings', (req, res) => {
 
 app.get('/api/proxy/tenants/:slug', (req, res) => {
   const slug = String(req.params.slug || '').toLowerCase();
-  const tenant = readTenants()[slug];
-  if (!tenant) return res.status(404).json({ found: false });
+  if (!/^[a-z0-9-]{1,40}$/.test(slug)) return res.status(400).json({ found: false });
 
-  const settings = { ...(tenant.settings || {}) };
+  // An unlisted slug is not an error. Every customer link works out of the box,
+  // with the name read off the URL and the shared configuration behind it.
+  const tenant = readTenants()[slug] || {};
+
+  let settings = tenant.settings;
+  if (!settings) {
+    try {
+      settings = process.env.CHECKOUT_SETTINGS_JSON ? JSON.parse(process.env.CHECKOUT_SETTINGS_JSON) : {};
+    } catch (e) {
+      settings = {};
+    }
+  }
+  settings = { ...settings };
   // Belt and braces: strip anything credential-shaped before it leaves.
   delete settings.credentials;
 
   return res.json({
     found: true,
-    brand: { slug, name: tenant.name || slug, tagline: tenant.tagline },
+    brand: {
+      slug,
+      name: tenant.name || nameFromSlug(slug),
+      tagline: tenant.tagline,
+    },
     settings,
   });
 });
