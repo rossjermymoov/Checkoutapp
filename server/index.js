@@ -118,15 +118,17 @@ app.post('/api/proxy/pickup-locations/:courier', async (req, res) => {
   });
 });
 
-// 3. Billing API: Get Quote
+// 3. Billing API: Get Quote (POST https://production.billingapi.co.uk/api/customer-routes/get-quote)
 app.post('/api/proxy/billing-quote', async (req, res) => {
   const clientName = req.headers['client_name'];
   const customerDcId = req.headers['customer_dc_id'];
   const customerKey = req.headers['customer_key'];
   const customUrl = req.headers['x-endpoint-url'];
 
-  const targetUrl = customUrl || 'https://production.billingapi.co.uk/api/customer-routes/get-quote';
-  console.log(`[PROXY -> BillingAPI] Fetching quote from ${targetUrl}`);
+  let targetUrl = (customUrl && customUrl !== 'undefined') ? customUrl : 'https://production.billingapi.co.uk/api/customer-routes/get-quote';
+  targetUrl = targetUrl.trim().replace(/\/+$/, '');
+
+  console.log(`[PROXY -> BillingAPI] POST quote from ${targetUrl} (client: "${clientName}", dc: "${customerDcId}")`);
 
   await handleUpstreamFetch(res, targetUrl, {
     method: 'POST',
@@ -137,6 +139,13 @@ app.post('/api/proxy/billing-quote', async (req, res) => {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(req.body),
+  });
+});
+
+app.get('/api/proxy/billing-quote', (req, res) => {
+  res.status(405).json({
+    error: 'Method Not Allowed: /api/proxy/billing-quote requires POST.',
+    hint: 'The Billing API get-quote endpoint only accepts POST requests with a shipment JSON payload.'
   });
 });
 

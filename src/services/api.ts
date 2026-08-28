@@ -228,7 +228,7 @@ export async function getPickupLocations(
   }
 }
 
-// 3. Billing API: Get Quote (https://production.billingapi.co.uk/api/customer-routes/get-quote)
+// 3. Billing API: Get Quote (POST https://production.billingapi.co.uk/api/customer-routes/get-quote)
 export async function getBillingQuote(
   customer: CustomerDetails,
   credentials: ApiCredentials,
@@ -236,18 +236,19 @@ export async function getBillingQuote(
 ): Promise<{ quotes: Record<string, number>; rawResponse?: any; fromLive: boolean; error?: string }> {
   const startTime = Date.now();
   const endpoint = '/api/proxy/billing-quote';
+  const targetUrl = credentials.billingEndpointUrl || 'https://production.billingapi.co.uk/api/customer-routes/get-quote';
   const headers: Record<string, string> = {
     'client_name': credentials.billingClientName || 'Moov Parcel',
     'customer_dc_id': credentials.billingCustomerDcId || 'Kitloop',
     'customer_key': credentials.billingCustomerKey || 'b62e9045a42d43468840c6e07b568fcd',
-    'x-endpoint-url': credentials.billingEndpointUrl,
+    'x-endpoint-url': targetUrl,
     'Content-Type': 'application/json',
   };
 
   const body = {
-    auth_company: credentials.voilaAuthCompany || 'YTC',
+    auth_company: credentials.voilaAuthCompany || '',
     format_address_default: true,
-    request_id: "req_" + Math.random().toString(36).substring(2, 10),
+    request_id: "req_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 8),
     shipment: {
       label_size: "6x4",
       label_format: "pdf",
@@ -256,9 +257,9 @@ export async function getBillingQuote(
       collection_date: new Date().toISOString().replace('T', ' ').substring(0, 19),
       reference: "checkout-quote",
       reference_2: "",
-      delivery_instructions: "Leave in safe place",
+      delivery_instructions: "",
       ship_from: {
-        name: "Ross Jermy",
+        name: "Ross",
         phone: "01111111111",
         email: "ross.jermy@gmail.com",
         company_name: "Logistics Hub",
@@ -267,7 +268,7 @@ export async function getBillingQuote(
         address_3: "",
         city: "Leeds",
         postcode: "LS1 2JP",
-        county: "West Yorkshire",
+        county: "",
         country_iso: "GB",
         company_id: "00000000",
         tax_id: "GB123456789",

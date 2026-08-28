@@ -82,9 +82,9 @@ const INITIAL_SERVICES: ConfiguredService[] = [
 ];
 
 export const DEFAULT_CREDENTIALS: ApiCredentials = {
-  voilaApiUser: 'ross.jermy@gmail.com',
-  voilaApiToken: 'voila_live_sec_789412984102',
-  voilaAuthCompany: 'YTC',
+  voilaApiUser: '',
+  voilaApiToken: '',
+  voilaAuthCompany: '',
   billingClientName: 'Moov Parcel',
   billingCustomerDcId: 'Kitloop',
   billingCustomerKey: 'b62e9045a42d43468840c6e07b568fcd',
@@ -119,6 +119,10 @@ function loadPersistedCredentials(): ApiCredentials {
     const permanent = localStorage.getItem(PERMANENT_CREDENTIALS_KEY);
     if (permanent) {
       const parsed = JSON.parse(permanent);
+      // Cleanse any fake token artifacts
+      if (parsed.voilaApiToken && parsed.voilaApiToken.includes('voila_live_sec')) {
+        parsed.voilaApiToken = '';
+      }
       result = { ...result, ...parsed };
       return result;
     }

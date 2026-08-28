@@ -160,12 +160,12 @@ export const ApiInspector: React.FC = () => {
                         }`}
                       >
                         HTTP {currentLog.responseStatus || (currentLog.success ? 200 : 500)}{' '}
-                        {currentLog.responseStatus === 405
-                          ? '• 405 Method Not Allowed (Requires POST)'
+                        {currentLog.responseStatus === 200 || currentLog.success
+                          ? '• 200 OK'
+                          : currentLog.responseStatus === 405
+                          ? '• 405 Method Not Allowed (Endpoint requires POST)'
                           : currentLog.responseStatus === 401
                           ? '• 401 Unauthorized (Auth Header Required)'
-                          : currentLog.success
-                          ? '• 200 OK'
                           : '• Error'}
                       </span>{' '}
                       • Latency: <span className="text-amber-400">{currentLog.durationMs}ms</span>

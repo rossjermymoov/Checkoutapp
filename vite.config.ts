@@ -54,17 +54,28 @@ function apiProxyPlugin(): Plugin {
             return sendJsonResponse(200, { status: 'ok', server: 'vite-integrated-proxy' });
           }
 
-          // 2. BillingAPI Get Quote
-          if (urlPath === '/api/proxy/billing-quote' && req.method === 'POST') {
+          // 2. BillingAPI Get Quote: POST https://production.billingapi.co.uk/api/customer-routes/get-quote
+          if (urlPath === '/api/proxy/billing-quote') {
+            if (req.method !== 'POST') {
+              return sendJsonResponse(405, {
+                error: `Method Not Allowed: /api/proxy/billing-quote requires POST (received ${req.method}).`,
+                hint: 'The Billing API get-quote endpoint only accepts POST requests with a shipment JSON payload.'
+              });
+            }
+
             const body = await readBody();
             const clientName = (req.headers['client_name'] as string) || 'Moov Parcel';
             const customerDcId = (req.headers['customer_dc_id'] as string) || 'Kitloop';
             const customerKey = (req.headers['customer_key'] as string) || 'b62e9045a42d43468840c6e07b568fcd';
-            const customUrl = (req.headers['x-endpoint-url'] as string) || 'https://production.billingapi.co.uk/api/customer-routes/get-quote';
+            let targetUrl = (req.headers['x-endpoint-url'] as string) || 'https://production.billingapi.co.uk/api/customer-routes/get-quote';
+            if (targetUrl === 'undefined' || !targetUrl.trim()) {
+              targetUrl = 'https://production.billingapi.co.uk/api/customer-routes/get-quote';
+            }
+            targetUrl = targetUrl.trim().replace(/\/+$/, '');
 
-            console.log(`[VITE PROXY -> BillingAPI] Quoting at ${customUrl} for client: "${clientName}", dc: "${customerDcId}"`);
+            console.log(`[VITE PROXY -> BillingAPI] POST ${targetUrl} (client: "${clientName}", dc: "${customerDcId}")`);
 
-            const upstreamRes = await fetch(customUrl, {
+            const upstreamRes = await fetch(targetUrl, {
               method: 'POST',
               headers: {
                 'client_name': clientName,
@@ -83,6 +94,7 @@ function apiProxyPlugin(): Plugin {
               console.warn(`[VITE PROXY] BillingAPI returned non-JSON (${upstreamRes.status}):`, text.substring(0, 200));
               return sendJsonResponse(upstreamRes.status, {
                 error: `Upstream BillingAPI returned non-JSON response (HTTP ${upstreamRes.status})`,
+                status: upstreamRes.status,
                 raw: text.substring(0, 300)
               });
             }
