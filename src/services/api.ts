@@ -15,6 +15,15 @@ const DEMO_ADDRESS = {
   postcode: 'B66 1BY',
 };
 
+// Active customer tenant, sent as x-tenant so the server can resolve that
+// customer's own carrier credentials. Set by the store rather than imported
+// from it, to avoid a circular dependency.
+let activeTenant: string | null = null;
+export const setActiveTenant = (slug: string | null) => {
+  activeTenant = slug;
+};
+const tenantHeader = (): Record<string, string> => (activeTenant ? { 'x-tenant': activeTenant } : {});
+
 // Global logger subscriber
 type LogListener = (entry: ApiLogEntry) => void;
 let logListener: LogListener | null = null;
@@ -159,6 +168,7 @@ export async function getMoovParcelPresets(
   const headers: Record<string, string> = {
     'api-user': credentials.voilaApiUser || '',
     'api-token': credentials.voilaApiToken || '',
+    ...tenantHeader(),
   };
 
   try {
@@ -228,6 +238,7 @@ export async function getCourierPresets(
   const headers: Record<string, string> = {
     'api-user': credentials.voilaApiUser,
     'api-token': credentials.voilaApiToken,
+    ...tenantHeader(),
   };
 
   // Sandbox mode still reads the real catalogue: knowing which services exist
@@ -298,6 +309,7 @@ export async function getPickupLocations(
     'api-user': credentials.voilaApiUser,
     'api-token': credentials.voilaApiToken,
     'Content-Type': 'application/json',
+    ...tenantHeader(),
   };
 
   const body = {
@@ -425,6 +437,7 @@ export async function getBillingQuote(
     'customer_key': credentials.billingCustomerKey || '',
     'x-endpoint-url': targetUrl,
     'Content-Type': 'application/json',
+    ...tenantHeader(),
   };
 
   const body = {

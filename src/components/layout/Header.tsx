@@ -5,9 +5,19 @@ import { SettingsStore } from '../../store/settingsStore';
 interface HeaderProps {
   activeTab: 'checkout' | 'settings';
   setActiveTab: (tab: 'checkout' | 'settings') => void;
+  brandName?: string;
+  tagline?: string;
+  /** False on a customer link: no settings tab, no sandbox switch. */
+  showSettings?: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
+export const Header: React.FC<HeaderProps> = ({
+  activeTab,
+  setActiveTab,
+  brandName = 'Checkout Demo',
+  tagline,
+  showSettings = true,
+}) => {
   const settings = SettingsStore.getInstance();
   const [useLiveApi, setUseLiveApi] = React.useState(settings.credentials.useLiveApi);
 
@@ -32,16 +42,16 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <span className="text-xl font-bold tracking-tight text-gray-900">Checkout Demo</span>
+                <span className="text-xl font-bold tracking-tight text-gray-900">{brandName}</span>
               </div>
-              <p className="text-xs text-gray-500 hidden sm:block">Intelligent Carrier & Drop Shop Checkout</p>
+              <p className="text-xs text-gray-500 hidden sm:block">{tagline || 'Intelligent Carrier & Drop Shop Checkout'}</p>
             </div>
           </div>
 
           {/* Mode Switch & Tab Navigation */}
           <div className="flex items-center space-x-3 sm:space-x-4">
-            {/* Live API / Sandbox Toggle */}
-            <button
+            {/* Live API / Sandbox Toggle — merchant only */}
+            {showSettings && <button
               onClick={handleToggleMode}
               title={useLiveApi ? "Switch to Mock / Sandbox Mode" : "Switch to Live Voila & Billing APIs"}
               className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
@@ -53,9 +63,10 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
               <Server className={`w-3.5 h-3.5 ${useLiveApi ? 'text-emerald-600 animate-pulse' : 'text-amber-600'}`} />
               <span className="hidden sm:inline">{useLiveApi ? 'Live API Mode' : 'Sandbox / Mock Mode'}</span>
               <span className="sm:hidden">{useLiveApi ? 'Live' : 'Mock'}</span>
-            </button>
+            </button>}
 
-            {/* View Switcher Tabs */}
+            {/* View Switcher Tabs — merchant only */}
+            {showSettings && (
             <div className="bg-gray-100 p-1 rounded-xl flex items-center border border-gray-200">
               <button
                 onClick={() => setActiveTab('checkout')}
@@ -84,6 +95,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
                 )}
               </button>
             </div>
+            )}
           </div>
         </div>
       </div>

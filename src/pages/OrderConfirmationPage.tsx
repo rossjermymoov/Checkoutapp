@@ -5,7 +5,8 @@ import { CartProduct } from '../types/checkout';
 
 interface OrderConfirmationPageProps {
   onNewOrder: () => void;
-  onOpenSettings: () => void;
+  /** Absent on a customer link, where there is no console to open. */
+  onOpenSettings?: () => void;
 }
 
 export const OrderConfirmationPage: React.FC<OrderConfirmationPageProps> = ({
@@ -152,12 +153,14 @@ export const OrderConfirmationPage: React.FC<OrderConfirmationPageProps> = ({
 
         {/* Action Buttons */}
         <div className="p-6 sm:p-8 bg-gray-50 flex flex-col sm:flex-row items-center justify-between gap-3">
+          {onOpenSettings && (
           <button
             onClick={onOpenSettings}
             className="w-full sm:w-auto px-5 py-2.5 bg-white hover:bg-gray-100 text-gray-800 border border-gray-300 rounded-xl text-sm font-semibold transition-all shadow-xs flex items-center justify-center space-x-2"
           >
             <span>Open Carrier Settings Console</span>
           </button>
+          )}
 
           <button
             onClick={onNewOrder}

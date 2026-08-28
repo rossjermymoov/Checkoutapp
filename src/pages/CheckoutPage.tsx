@@ -9,7 +9,8 @@ import { CartSummary } from '../components/checkout/CartSummary';
 import { OrderConfirmationPage } from './OrderConfirmationPage';
 
 interface CheckoutPageProps {
-  onOpenSettings: () => void;
+  /** Absent on a customer link, where there is no console to open. */
+  onOpenSettings?: () => void;
 }
 
 export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onOpenSettings }) => {

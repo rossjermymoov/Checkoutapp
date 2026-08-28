@@ -1,5 +1,6 @@
 import { ApiCredentials, ConfiguredService, CourierConfig, PricingRule, DropShopSettings } from '../types/settings';
 import { emptyConditions } from '../services/pricingRules';
+import { setActiveTenant } from '../services/api';
 import { ApiLogEntry } from '../types/api';
 import { INITIAL_COURIERS } from '../services/mockData';
 import { setApiLogListener } from '../services/api';
@@ -223,6 +224,8 @@ export class SettingsStore {
    * money is a choice with no upside.
    */
   public hideDominatedServices: boolean = true;
+  /** Set on a /c/<slug> customer view; sent as x-tenant on API calls. */
+  public tenantSlug: string | null = null;
   public logs: ApiLogEntry[] = [];
 
   private constructor() {
@@ -287,6 +290,29 @@ export class SettingsStore {
     }
   }
 
+  /**
+   * Load a customer's configuration for a /c/<slug> view. Held in memory only:
+   * a customer's browser must not have the merchant's own configuration
+   * overwritten by a demo link, or vice versa.
+   */
+  public applyTenantSettings(slug: string, incoming: any) {
+    this.tenantSlug = slug;
+    setActiveTenant(slug);
+    if (!incoming) {
+      this.notify(false);
+      return;
+    }
+    const s = migrateSettings(incoming);
+    if (Array.isArray(s.services)) this.services = s.services;
+    if (Array.isArray(s.pricingRules)) this.pricingRules = s.pricingRules;
+    if (Array.isArray(s.couriers)) this.couriers = s.couriers;
+    if (s.dropShop) this.dropShop = { ...this.dropShop, ...s.dropShop };
+    if (typeof s.hideDominatedServices === 'boolean') {
+      this.hideDominatedServices = s.hideDominatedServices;
+    }
+    this.notify(false);
+  }
+
   /** Configuration as JSON for CHECKOUT_SETTINGS_JSON. Never includes secrets. */
   public exportConfiguration(): string {
     return JSON.stringify({
@@ -347,6 +373,8 @@ export class SettingsStore {
 
   private save() {
     if (typeof window === 'undefined' || !window.localStorage) return;
+    // A customer view never writes back — it is showing someone else's setup.
+    if (this.tenantSlug) return;
 
     // 1. Save credentials to permanent key
     localStorage.setItem(PERMANENT_CREDENTIALS_KEY, JSON.stringify(this.credentials));

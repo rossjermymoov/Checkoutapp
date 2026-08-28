@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Sliders, Key, PackageCheck, PoundSterling, MapPin, Terminal, RotateCcw, Check, Sparkles, Server, Layers } from 'lucide-react';
+import { Sliders, Key, PackageCheck, PoundSterling, MapPin, Terminal, RotateCcw, Check, Sparkles, Server, Layers, Users } from 'lucide-react';
 import { SettingsStore } from '../store/settingsStore';
 import { CredentialsSettings } from '../components/admin/CredentialsSettings';
 import { ServiceManager } from '../components/admin/ServiceManager';
 import { ServiceCatalogue } from '../components/admin/ServiceCatalogue';
+import { CustomerLinks } from '../components/admin/CustomerLinks';
 import { PricingRules } from '../components/admin/PricingRules';
 import { DropShopSettings } from '../components/admin/DropShopSettings';
 import { ApiInspector } from '../components/admin/ApiInspector';
@@ -12,7 +13,7 @@ import { CourierConfig, ConfiguredService } from '../types/settings';
 export const SettingsPage: React.FC = () => {
   const settings = SettingsStore.getInstance();
   const [, setTick] = useState(0);
-  const [activeSubTab, setActiveSubTab] = useState<'credentials' | 'catalogue' | 'services' | 'pricing' | 'dropshop' | 'inspector'>('credentials');
+  const [activeSubTab, setActiveSubTab] = useState<'credentials' | 'catalogue' | 'services' | 'pricing' | 'dropshop' | 'customers' | 'inspector'>('credentials');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   React.useEffect(() => {
@@ -130,6 +131,18 @@ export const SettingsPage: React.FC = () => {
           </button>
 
           <button
+            onClick={() => setActiveSubTab('customers')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2 whitespace-nowrap ${
+              activeSubTab === 'customers'
+                ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20'
+                : 'bg-white hover:bg-gray-100 text-gray-700 border border-gray-200'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>Customer Links</span>
+          </button>
+
+          <button
             onClick={() => setActiveSubTab('inspector')}
             className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2 whitespace-nowrap ${
               activeSubTab === 'inspector'
@@ -184,6 +197,7 @@ export const SettingsPage: React.FC = () => {
         {activeSubTab === 'services' && <ServiceManager />}
         {activeSubTab === 'pricing' && <PricingRules />}
         {activeSubTab === 'dropshop' && <DropShopSettings />}
+        {activeSubTab === 'customers' && <CustomerLinks />}
         {activeSubTab === 'inspector' && <ApiInspector />}
       </div>
     </div>

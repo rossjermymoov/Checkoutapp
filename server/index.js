@@ -43,6 +43,38 @@ app.use((req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// Tenants (per-customer demo links)
+// ---------------------------------------------------------------------------
+// CHECKOUT_TENANTS_JSON holds every customer keyed by slug:
+//
+//   { "acme": { "name": "Acme Retail",
+//               "settings": { ...exported configuration... },
+//               "credentials": { "billingCustomerDcId": "AcmeDC", ... } } }
+//
+// The credentials block is optional and NEVER leaves this process — it exists so
+// customers can be quoted against their own carrier account. Everything else is
+// public to whoever holds the link.
+
+function readTenants() {
+  const raw = process.env.CHECKOUT_TENANTS_JSON;
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (e) {
+    console.warn('[PROXY] CHECKOUT_TENANTS_JSON is not valid JSON, ignoring it.');
+    return {};
+  }
+}
+
+function tenantFromRequest(req) {
+  const slug = String(req.headers['x-tenant'] || '').toLowerCase().trim();
+  if (!slug) return null;
+  const tenants = readTenants();
+  return tenants[slug] || null;
+}
+
+// ---------------------------------------------------------------------------
 // Credential resolution
 // ---------------------------------------------------------------------------
 // Precedence: request header (merchant console) -> local override file -> env var.
@@ -70,19 +102,29 @@ function pick(headerValue, overrideValue, envValue) {
 
 function resolveVoilaCredentials(req) {
   const o = readOverrides();
+  const t = tenantFromRequest(req)?.credentials || {};
   return {
-    apiUser: pick(req.headers['api-user'], o.voilaApiUser, process.env.VOILA_API_USER),
-    apiToken: pick(req.headers['api-token'], o.voilaApiToken, process.env.VOILA_API_TOKEN),
-    authCompany: pick(req.headers['auth-company'], o.voilaAuthCompany, process.env.VOILA_AUTH_COMPANY),
+    apiUser: pick(req.headers['api-user'], t.voilaApiUser || o.voilaApiUser, process.env.VOILA_API_USER),
+    apiToken: pick(req.headers['api-token'], t.voilaApiToken || o.voilaApiToken, process.env.VOILA_API_TOKEN),
+    authCompany: pick(
+      req.headers['auth-company'],
+      t.voilaAuthCompany || o.voilaAuthCompany,
+      process.env.VOILA_AUTH_COMPANY
+    ),
   };
 }
 
 function resolveBillingCredentials(req) {
   const o = readOverrides();
+  const t = tenantFromRequest(req)?.credentials || {};
   return {
-    clientName: pick(req.headers['client_name'], o.billingClientName, process.env.BILLING_CLIENT_NAME),
-    customerDcId: pick(req.headers['customer_dc_id'], o.billingCustomerDcId, process.env.BILLING_CUSTOMER_DC_ID),
-    customerKey: pick(req.headers['customer_key'], o.billingCustomerKey, process.env.BILLING_CUSTOMER_KEY),
+    clientName: pick(req.headers['client_name'], t.billingClientName || o.billingClientName, process.env.BILLING_CLIENT_NAME),
+    customerDcId: pick(
+      req.headers['customer_dc_id'],
+      t.billingCustomerDcId || o.billingCustomerDcId,
+      process.env.BILLING_CUSTOMER_DC_ID
+    ),
+    customerKey: pick(req.headers['customer_key'], t.billingCustomerKey || o.billingCustomerKey, process.env.BILLING_CUSTOMER_KEY),
     endpointUrl:
       pick(req.headers['x-endpoint-url'], o.billingEndpointUrl, process.env.BILLING_ENDPOINT_URL) ||
       BILLING_DEFAULT_URL,
@@ -214,6 +256,30 @@ app.get('/api/proxy/settings', (req, res) => {
     console.warn('[PROXY] CHECKOUT_SETTINGS_JSON is not valid JSON, ignoring it.');
     return res.json({ configured: false, error: 'CHECKOUT_SETTINGS_JSON is not valid JSON' });
   }
+});
+
+app.get('/api/proxy/tenants/:slug', (req, res) => {
+  const slug = String(req.params.slug || '').toLowerCase();
+  const tenant = readTenants()[slug];
+  if (!tenant) return res.status(404).json({ found: false });
+
+  const settings = { ...(tenant.settings || {}) };
+  // Belt and braces: strip anything credential-shaped before it leaves.
+  delete settings.credentials;
+
+  return res.json({
+    found: true,
+    brand: { slug, name: tenant.name || slug, tagline: tenant.tagline },
+    settings,
+  });
+});
+
+/** Slugs only, so the console can list what is configured. */
+app.get('/api/proxy/tenants', (req, res) => {
+  const tenants = readTenants();
+  res.json({
+    tenants: Object.entries(tenants).map(([slug, t]) => ({ slug, name: t?.name || slug })),
+  });
 });
 
 // 1. Courier presets
