@@ -182,10 +182,39 @@ export class CheckoutStore {
       const subtotal = this.getSubtotal();
       const isFreeThresholdMet = settings.pricing.freeShippingThreshold !== null && subtotal >= settings.pricing.freeShippingThreshold;
 
-      const enabledCourierKeys = new Set(settings.couriers.filter(c => c.enabled).map(c => c.key));
-      const activeServices = settings.services.filter(
-        (s) => s.enabled && !s.isDropShop && enabledCourierKeys.has(s.courier)
+      const enabledCourierKeys = new Set(
+        settings.couriers.filter(c => c.enabled).map(c => c.key.toLowerCase())
       );
+      const isCourierEnabled = (courierName: string) => {
+        const clean = (courierName || '').toLowerCase();
+        return Array.from(enabledCourierKeys).some(k => clean.includes(k) || k.includes(clean));
+      };
+
+      const activeServices = settings.services.filter(
+        (s) => s.enabled && !s.isDropShop && isCourierEnabled(s.courier)
+      );
+
+      // If BillingAPI returned live quoted services that aren't yet in configured services, dynamically add them
+      if (quoteRes.fromLive && Array.isArray(quoteRes.rawResponse)) {
+        quoteRes.rawResponse.forEach((liveItem: any) => {
+          const code = liveItem.service_code || liveItem.dc_service_id;
+          const courier = liveItem.courier || 'DPD';
+          if (code && isCourierEnabled(courier) && !activeServices.some(s => s.dc_service_id === code)) {
+            activeServices.unshift({
+              dc_service_id: code,
+              courier: courier.includes('Yodel') ? 'Yodel' : courier.includes('DPD') ? 'DPD' : courier,
+              originalName: liveItem.service_name || code,
+              displayName: liveItem.service_name || code,
+              leadTime: 'Next Working Day (Live Quote)',
+              enabled: true,
+              priority: 0,
+              isDropShop: false,
+              badgeText: 'Live Rate',
+              priceOverride: null,
+            });
+          }
+        });
+      }
 
       const options: SelectedShippingOption[] = activeServices.map((service) => {
         let baseRate = service.priceOverride ?? quotes[service.dc_service_id] ?? settings.pricing.defaultFallbackRate;
@@ -242,14 +271,20 @@ export class CheckoutStore {
         }
       }
 
+      // Sort strictly by distance from customer address
+      allLocations.sort((a, b) => a.distance - b.distance);
+
       const filtered = allLocations
         .filter((loc) => loc.distance <= settings.dropShop.maxRadiusMiles)
         .slice(0, settings.dropShop.maxLocations);
 
       this.pickupLocations = filtered.length > 0 ? filtered : allLocations.slice(0, settings.dropShop.maxLocations);
 
-      if (this.deliveryMode === 'drop_shop' && this.pickupLocations.length > 0 && !this.selectedPickupLocation) {
-        this.selectPickupLocation(this.pickupLocations[0]);
+      if (this.deliveryMode === 'drop_shop' && this.pickupLocations.length > 0) {
+        // If current selection is not in list, select the closest one
+        if (!this.selectedPickupLocation || !this.pickupLocations.some(l => l.pickupLocation.pickupLocationCode === this.selectedPickupLocation?.pickupLocation.pickupLocationCode)) {
+          this.selectPickupLocation(this.pickupLocations[0]);
+        }
       }
     } catch (error) {
       console.error('Failed to load pickup locations:', error);

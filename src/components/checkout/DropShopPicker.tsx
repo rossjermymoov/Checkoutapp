@@ -21,7 +21,10 @@ export const DropShopPicker: React.FC<DropShopPickerProps> = ({
 
   useEffect(() => {
     checkout.loadPickupLocations();
-    return checkout.subscribe(() => setTick((t) => t + 1));
+    return checkout.subscribe(() => {
+      setTick((t) => t + 1);
+      setPostcodeSearch(checkout.customer.postcode);
+    });
   }, [checkout]);
 
   const locations = checkout.pickupLocations;

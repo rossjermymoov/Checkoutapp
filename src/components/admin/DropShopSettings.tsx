@@ -26,9 +26,10 @@ export const DropShopSettings: React.FC = () => {
 
   const availableNetworks = [
     { key: 'DPD', name: 'DPD Pickup Network (10,000+ Stores)' },
+    { key: 'UPS', name: 'UPS Access Point Network' },
+    { key: 'Yodel', name: 'Yodel Store / Collect Point' },
     { key: 'InPost', name: 'InPost 24/7 Automated Lockers' },
     { key: 'Evri', name: 'Evri ParcelShop & Lockers' },
-    { key: 'UPS', name: 'UPS Access Point Network' },
   ];
 
   return (

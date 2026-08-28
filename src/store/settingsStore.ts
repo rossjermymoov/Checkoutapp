@@ -3,14 +3,14 @@ import { ApiLogEntry } from '../types/api';
 import { INITIAL_COURIERS, MOCK_PRESETS_BY_COURIER } from '../services/mockData';
 import { setApiLogListener } from '../services/api';
 
-const STORAGE_KEY = 'checkout_demo_settings_v2';
+const STORAGE_KEY = 'checkout_demo_settings_v3';
 
 const INITIAL_SERVICES: ConfiguredService[] = [
   {
-    dc_service_id: "DPD-NEXT-DAY",
+    dc_service_id: "DPD12-DROP",
     courier: "DPD",
-    originalName: "DPD Next Day Standard",
-    displayName: "DPD Next Day Priority",
+    originalName: "DPD Drop Off Next Day",
+    displayName: "DPD Drop Off Next Day",
     leadTime: "Next Working Day (1-hr window)",
     enabled: true,
     priority: 1,
@@ -19,61 +19,37 @@ const INITIAL_SERVICES: ConfiguredService[] = [
     priceOverride: null,
   },
   {
-    dc_service_id: "DPD-12PM",
-    courier: "DPD",
-    originalName: "DPD Priority by 12:00 PM",
-    displayName: "DPD Express Pre-Noon",
-    leadTime: "Next Day before 12:00",
+    dc_service_id: "YODC2C",
+    courier: "Yodel",
+    originalName: "Yodel C2C",
+    displayName: "Yodel C2C Tracked Delivery",
+    leadTime: "2-3 Working Days",
     enabled: true,
     priority: 2,
     isDropShop: false,
-    badgeText: null,
-    priceOverride: null,
-  },
-  {
-    dc_service_id: "EVRI-STANDARD",
-    courier: "Evri",
-    originalName: "Evri Standard Tracked",
-    displayName: "Evri Standard Tracked",
-    leadTime: "2-3 Business Days",
-    enabled: true,
-    priority: 3,
-    isDropShop: false,
-    badgeText: "Best Value",
-    priceOverride: null,
-  },
-  {
-    dc_service_id: "EVRI-NEXT-DAY",
-    courier: "Evri",
-    originalName: "Evri Next Day Delivery",
-    displayName: "Evri Next Day Tracked",
-    leadTime: "Next Working Day",
-    enabled: true,
-    priority: 4,
-    isDropShop: false,
-    badgeText: null,
+    badgeText: "Popular",
     priceOverride: null,
   },
   {
     dc_service_id: "UPS-STANDARD",
     courier: "UPS",
     originalName: "UPS Standard Ground",
-    displayName: "UPS Carbon Neutral Ground",
+    displayName: "UPS Standard Delivery",
     leadTime: "1-2 Business Days",
     enabled: true,
-    priority: 5,
+    priority: 3,
     isDropShop: false,
     badgeText: null,
     priceOverride: null,
   },
   {
-    dc_service_id: "RM-TRACKED-24",
-    courier: "RoyalMail",
-    originalName: "Royal Mail Tracked 24",
-    displayName: "Royal Mail Tracked 24",
-    leadTime: "1-2 Days Guaranteed",
+    dc_service_id: "DPD-NEXT-DAY",
+    courier: "DPD",
+    originalName: "DPD Next Day Standard",
+    displayName: "DPD Next Day Door-to-Door",
+    leadTime: "Next Working Day",
     enabled: true,
-    priority: 6,
+    priority: 4,
     isDropShop: false,
     badgeText: null,
     priceOverride: null,
@@ -85,9 +61,21 @@ const INITIAL_SERVICES: ConfiguredService[] = [
     displayName: "DPD Local ParcelShop Collection",
     leadTime: "Next Day to Local Store",
     enabled: true,
-    priority: 7,
+    priority: 5,
     isDropShop: true,
     badgeText: "Eco-Friendly",
+    priceOverride: null,
+  },
+  {
+    dc_service_id: "UPS-ACCESS-POINT",
+    courier: "UPS",
+    originalName: "UPS Access Point Economy Collect",
+    displayName: "UPS Access Point Collection",
+    leadTime: "Next Day to Access Point",
+    enabled: true,
+    priority: 6,
+    isDropShop: true,
+    badgeText: null,
     priceOverride: null,
   },
   {
@@ -97,7 +85,7 @@ const INITIAL_SERVICES: ConfiguredService[] = [
     displayName: "InPost 24/7 Parcel Locker",
     leadTime: "Next Day 24/7 Pickup",
     enabled: true,
-    priority: 8,
+    priority: 7,
     isDropShop: true,
     badgeText: "24/7 Pickup",
     priceOverride: null,
@@ -112,7 +100,7 @@ const DEFAULT_CREDENTIALS: ApiCredentials = {
   billingCustomerDcId: 'Kitloop',
   billingCustomerKey: 'b62e9045a42d43468840c6e07b568fcd',
   billingEndpointUrl: 'https://production.billingapi.co.uk/api/customer-routes/get-quote',
-  useLiveApi: false,
+  useLiveApi: true,
 };
 
 const DEFAULT_PRICING: PricingRules = {
@@ -126,7 +114,7 @@ const DEFAULT_DROPSHOP: DropShopSettings = {
   enabled: true,
   maxRadiusMiles: 5,
   maxLocations: 8,
-  enabledCouriers: ['DPD', 'InPost', 'Evri', 'UPS'],
+  enabledCouriers: ['DPD', 'UPS', 'Yodel', 'InPost'],
 };
 
 export class SettingsStore {
@@ -208,7 +196,7 @@ export class SettingsStore {
 
   public toggleCourier(courierKey: string, enabled?: boolean) {
     this.couriers = this.couriers.map((c) =>
-      c.key === courierKey ? { ...c, enabled: enabled !== undefined ? enabled : !c.enabled } : c
+      c.key.toLowerCase() === courierKey.toLowerCase() ? { ...c, enabled: enabled !== undefined ? enabled : !c.enabled } : c
     );
     this.notify();
   }

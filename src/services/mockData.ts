@@ -22,11 +22,11 @@ export const DEFAULT_CUSTOMER: CustomerDetails = {
   firstName: "Ross",
   lastName: "Jermy",
   phone: "07841 552 355",
-  address1: "9 Mellor Meadows",
-  address2: "Whittington",
-  city: "Oswestry",
-  county: "Shropshire",
-  postcode: "SY11 4FN",
+  address1: "Roebuck Lane",
+  address2: "",
+  city: "Birmingham",
+  county: "West Midlands",
+  postcode: "B66 1BY",
   country: "United Kingdom",
   countryIso: "GB",
   saveInformation: true,
@@ -66,9 +66,9 @@ export const INITIAL_COURIERS: CourierConfig[] = [
     enabled: true,
   },
   {
-    key: "Evri",
-    name: "Evri",
-    logo: "https://app.heyvoila.io/courier-service-logos/evri.jpg",
+    key: "Yodel",
+    name: "Yodel",
+    logo: "https://app.heyvoila.io/courier-service-logos/yodel.jpg",
     enabled: true,
   },
   {
@@ -78,22 +78,28 @@ export const INITIAL_COURIERS: CourierConfig[] = [
     enabled: true,
   },
   {
+    key: "InPost",
+    name: "InPost Lockers",
+    logo: "https://app.heyvoila.io/courier-service-logos/inpost.jpg",
+    enabled: true,
+  },
+  {
+    key: "Evri",
+    name: "Evri",
+    logo: "https://app.heyvoila.io/courier-service-logos/evri.jpg",
+    enabled: false, // No live credentials
+  },
+  {
     key: "DHLParcelUK",
     name: "DHL Express / Parcel UK",
     logo: "https://app.heyvoila.io/courier-service-logos/dhl.jpg",
-    enabled: true,
+    enabled: false,
   },
   {
     key: "RoyalMail",
     name: "Royal Mail",
     logo: "https://app.heyvoila.io/courier-service-logos/royalmail.jpg",
-    enabled: true,
-  },
-  {
-    key: "InPost",
-    name: "InPost Lockers",
-    logo: "https://app.heyvoila.io/courier-service-logos/inpost.jpg",
-    enabled: true,
+    enabled: false,
   }
 ];
 
@@ -101,29 +107,29 @@ export const MOCK_PRESETS_BY_COURIER: Record<string, VoilaPreset[]> = {
   DPD: [
     {
       id: 3998,
-      dc_service_id: "DPD-NEXT-DAY",
+      dc_service_id: "DPD12-DROP",
       api_user_id: 1,
       courier: "DPD",
-      name: "DPD Next Day Standard",
-      lead_time: "Next Day (1-hour delivery window)",
+      name: "DPD Drop Off Next Day",
+      lead_time: "Next Working Day (1-hr window)",
       rule_supported_countries: "GB"
     },
     {
       id: 3999,
-      dc_service_id: "DPD-12PM",
+      dc_service_id: "DPD-NEXT-DAY",
       api_user_id: 1,
       courier: "DPD",
-      name: "DPD Priority by 12:00 PM",
-      lead_time: "Next Day before 12:00",
+      name: "DPD Next Day Standard",
+      lead_time: "Next Day Delivery",
       rule_supported_countries: "GB"
     },
     {
       id: 4001,
-      dc_service_id: "DPD-SATURDAY",
+      dc_service_id: "DPD-12PM",
       api_user_id: 1,
       courier: "DPD",
-      name: "DPD Saturday Guaranteed",
-      lead_time: "Guaranteed Saturday delivery",
+      name: "DPD Express Priority by 12PM",
+      lead_time: "Next Day before 12:00",
       rule_supported_countries: "GB"
     },
     {
@@ -136,32 +142,32 @@ export const MOCK_PRESETS_BY_COURIER: Record<string, VoilaPreset[]> = {
       rule_supported_countries: "GB"
     }
   ],
-  Evri: [
+  Yodel: [
     {
-      id: 5001,
-      dc_service_id: "EVRI-STANDARD",
+      id: 4501,
+      dc_service_id: "YODC2C",
       api_user_id: 1,
-      courier: "Evri",
-      name: "Evri Standard Tracked",
-      lead_time: "2-4 Business Days",
+      courier: "Yodel",
+      name: "Yodel C2C Delivery",
+      lead_time: "2-3 Working Days Tracked",
       rule_supported_countries: "GB"
     },
     {
-      id: 5002,
-      dc_service_id: "EVRI-NEXT-DAY",
+      id: 4502,
+      dc_service_id: "YODEL-DIRECT",
       api_user_id: 1,
-      courier: "Evri",
-      name: "Evri Next Day Delivery",
+      courier: "Yodel",
+      name: "Yodel Direct Next Day",
       lead_time: "Next Working Day",
       rule_supported_countries: "GB"
     },
     {
-      id: 5003,
-      dc_service_id: "EVRI-PARCELSHOP",
+      id: 4503,
+      dc_service_id: "YODEL-STORE",
       api_user_id: 1,
-      courier: "Evri",
-      name: "Evri ParcelShop / Locker Collection",
-      lead_time: "2 Business Days",
+      courier: "Yodel",
+      name: "Yodel Store Collect Point",
+      lead_time: "2 Working Days to Store",
       rule_supported_countries: "GB"
     }
   ],
@@ -194,43 +200,23 @@ export const MOCK_PRESETS_BY_COURIER: Record<string, VoilaPreset[]> = {
       rule_supported_countries: "GB"
     }
   ],
-  DHLParcelUK: [
+  Evri: [
     {
-      id: 7001,
-      dc_service_id: "DHL-NEXT-DAY",
+      id: 5001,
+      dc_service_id: "EVRI-STANDARD",
       api_user_id: 1,
-      courier: "DHLParcelUK",
-      name: "DHL Express Next Day UK",
-      lead_time: "Next Day by 6pm",
+      courier: "Evri",
+      name: "Evri Standard Tracked",
+      lead_time: "2-4 Business Days",
       rule_supported_countries: "GB"
     },
     {
-      id: 7002,
-      dc_service_id: "DHL-EXPRESS-12",
+      id: 5002,
+      dc_service_id: "EVRI-NEXT-DAY",
       api_user_id: 1,
-      courier: "DHLParcelUK",
-      name: "DHL Express Pre-12:00",
-      lead_time: "Next Morning before 12:00",
-      rule_supported_countries: "GB"
-    }
-  ],
-  RoyalMail: [
-    {
-      id: 8001,
-      dc_service_id: "RM-TRACKED-24",
-      api_user_id: 1,
-      courier: "RoyalMail",
-      name: "Royal Mail Tracked 24",
-      lead_time: "1 Working Day",
-      rule_supported_countries: "GB"
-    },
-    {
-      id: 8002,
-      dc_service_id: "RM-TRACKED-48",
-      api_user_id: 1,
-      courier: "RoyalMail",
-      name: "Royal Mail Tracked 48",
-      lead_time: "2-3 Working Days",
+      courier: "Evri",
+      name: "Evri Next Day Delivery",
+      lead_time: "Next Working Day",
       rule_supported_countries: "GB"
     }
   ],
@@ -247,166 +233,17 @@ export const MOCK_PRESETS_BY_COURIER: Record<string, VoilaPreset[]> = {
   ]
 };
 
-export const MOCK_PICKUP_LOCATIONS: PickupLocationItem[] = [
-  {
-    pickupLocation: {
-      pickupLocationCode: "DPD-GB17223",
-      address: {
-        organisation: "Oldbury Express & Newsagents",
-        street: "Unit 10-1 West Cross Shopping Centre",
-        town: "Smethwick",
-        county: "West Midlands",
-        postcode: "B66 1JG",
-        countryCode: "GB"
-      },
-      pickupLocationType: "200",
-      shortName: "Oldbury Express (DPD Pickup)",
-      depotDescription: "Dudley Port SuperHub",
-      openLate: true,
-      openSaturday: true,
-      openSunday: true,
-      courier: "DPD",
-      pickupLocationAvailability: {
-        pickupLocationOpenWindow: [
-          { pickupLocationOpenWindowDay: 1, pickupLocationOpenWindowStartTime: "07:00", pickupLocationOpenWindowEndTime: "22:00" },
-          { pickupLocationOpenWindowDay: 2, pickupLocationOpenWindowStartTime: "07:00", pickupLocationOpenWindowEndTime: "22:00" },
-          { pickupLocationOpenWindowDay: 3, pickupLocationOpenWindowStartTime: "07:00", pickupLocationOpenWindowEndTime: "22:00" },
-          { pickupLocationOpenWindowDay: 4, pickupLocationOpenWindowStartTime: "07:00", pickupLocationOpenWindowEndTime: "22:00" },
-          { pickupLocationOpenWindowDay: 5, pickupLocationOpenWindowStartTime: "07:00", pickupLocationOpenWindowEndTime: "22:00" },
-          { pickupLocationOpenWindowDay: 6, pickupLocationOpenWindowStartTime: "08:00", pickupLocationOpenWindowEndTime: "21:00" },
-          { pickupLocationOpenWindowDay: 7, pickupLocationOpenWindowStartTime: "09:00", pickupLocationOpenWindowEndTime: "20:00" }
-        ]
-      }
-    },
-    distance: 0.35,
-    addressPoint: {
-      latitude: 52.505581,
-      longitude: -1.978301
-    }
-  },
-  {
-    pickupLocation: {
-      pickupLocationCode: "INPOST-LOCK-4882",
-      address: {
-        organisation: "Tesco Extra Locker Station 24/7",
-        street: "New Square, Reform Street",
-        town: "West Bromwich",
-        county: "West Midlands",
-        postcode: "B70 7PP",
-        countryCode: "GB"
-      },
-      pickupLocationType: "Locker",
-      shortName: "InPost 24/7 Locker - Tesco Extra",
-      depotDescription: "Automated Self-Service Locker",
-      openLate: true,
-      openSaturday: true,
-      openSunday: true,
-      courier: "InPost",
-      pickupLocationAvailability: {
-        pickupLocationOpenWindow: [
-          { pickupLocationOpenWindowDay: 1, pickupLocationOpenWindowStartTime: "00:00", pickupLocationOpenWindowEndTime: "23:59" },
-          { pickupLocationOpenWindowDay: 2, pickupLocationOpenWindowStartTime: "00:00", pickupLocationOpenWindowEndTime: "23:59" },
-          { pickupLocationOpenWindowDay: 3, pickupLocationOpenWindowStartTime: "00:00", pickupLocationOpenWindowEndTime: "23:59" },
-          { pickupLocationOpenWindowDay: 4, pickupLocationOpenWindowStartTime: "00:00", pickupLocationOpenWindowEndTime: "23:59" },
-          { pickupLocationOpenWindowDay: 5, pickupLocationOpenWindowStartTime: "00:00", pickupLocationOpenWindowEndTime: "23:59" },
-          { pickupLocationOpenWindowDay: 6, pickupLocationOpenWindowStartTime: "00:00", pickupLocationOpenWindowEndTime: "23:59" },
-          { pickupLocationOpenWindowDay: 7, pickupLocationOpenWindowStartTime: "00:00", pickupLocationOpenWindowEndTime: "23:59" }
-        ]
-      }
-    },
-    distance: 0.72,
-    addressPoint: {
-      latitude: 52.518210,
-      longitude: -1.996120
-    }
-  },
-  {
-    pickupLocation: {
-      pickupLocationCode: "EVRI-PS-8921",
-      address: {
-        organisation: "Spar Convenience & Post",
-        street: "42 High Street",
-        town: "Oswestry",
-        county: "Shropshire",
-        postcode: "SY11 1SP",
-        countryCode: "GB"
-      },
-      pickupLocationType: "200",
-      shortName: "Spar Convenience (Evri ParcelShop)",
-      depotDescription: "Shrewsbury Hub",
-      openLate: true,
-      openSaturday: true,
-      openSunday: true,
-      courier: "Evri",
-      pickupLocationAvailability: {
-        pickupLocationOpenWindow: [
-          { pickupLocationOpenWindowDay: 1, pickupLocationOpenWindowStartTime: "06:30", pickupLocationOpenWindowEndTime: "21:00" },
-          { pickupLocationOpenWindowDay: 2, pickupLocationOpenWindowStartTime: "06:30", pickupLocationOpenWindowEndTime: "21:00" },
-          { pickupLocationOpenWindowDay: 3, pickupLocationOpenWindowStartTime: "06:30", pickupLocationOpenWindowEndTime: "21:00" },
-          { pickupLocationOpenWindowDay: 4, pickupLocationOpenWindowStartTime: "06:30", pickupLocationOpenWindowEndTime: "21:00" },
-          { pickupLocationOpenWindowDay: 5, pickupLocationOpenWindowStartTime: "06:30", pickupLocationOpenWindowEndTime: "21:00" },
-          { pickupLocationOpenWindowDay: 6, pickupLocationOpenWindowStartTime: "07:00", pickupLocationOpenWindowEndTime: "20:00" },
-          { pickupLocationOpenWindowDay: 7, pickupLocationOpenWindowStartTime: "08:00", pickupLocationOpenWindowEndTime: "19:00" }
-        ]
-      }
-    },
-    distance: 1.15,
-    addressPoint: {
-      latitude: 52.859600,
-      longitude: -3.056000
-    }
-  },
-  {
-    pickupLocation: {
-      pickupLocationCode: "UPS-AP-9923",
-      address: {
-        organisation: "Whittington Village Stores",
-        street: "Station Road",
-        town: "Whittington, Oswestry",
-        county: "Shropshire",
-        postcode: "SY11 4NF",
-        countryCode: "GB"
-      },
-      pickupLocationType: "200",
-      shortName: "Whittington Stores (UPS Access Point)",
-      depotDescription: "Chester Sorting Center",
-      openLate: false,
-      openSaturday: true,
-      openSunday: false,
-      courier: "UPS",
-      pickupLocationAvailability: {
-        pickupLocationOpenWindow: [
-          { pickupLocationOpenWindowDay: 1, pickupLocationOpenWindowStartTime: "08:00", pickupLocationOpenWindowEndTime: "18:00" },
-          { pickupLocationOpenWindowDay: 2, pickupLocationOpenWindowStartTime: "08:00", pickupLocationOpenWindowEndTime: "18:00" },
-          { pickupLocationOpenWindowDay: 3, pickupLocationOpenWindowStartTime: "08:00", pickupLocationOpenWindowEndTime: "18:00" },
-          { pickupLocationOpenWindowDay: 4, pickupLocationOpenWindowStartTime: "08:00", pickupLocationOpenWindowEndTime: "18:00" },
-          { pickupLocationOpenWindowDay: 5, pickupLocationOpenWindowStartTime: "08:00", pickupLocationOpenWindowEndTime: "18:00" },
-          { pickupLocationOpenWindowDay: 6, pickupLocationOpenWindowStartTime: "09:00", pickupLocationOpenWindowEndTime: "16:00" }
-        ]
-      }
-    },
-    distance: 0.48,
-    addressPoint: {
-      latitude: 52.873200,
-      longitude: -3.001400
-    }
-  }
-];
-
 export const MOCK_BILLING_QUOTES: Record<string, number> = {
+  "DPD12-DROP": 5.00,
+  "YODC2C": 5.00,
   "DPD-NEXT-DAY": 4.95,
   "DPD-12PM": 7.50,
   "DPD-SATURDAY": 9.99,
   "DPD-PICKUP": 3.49,
-  "EVRI-STANDARD": 2.99,
-  "EVRI-NEXT-DAY": 3.99,
-  "EVRI-PARCELSHOP": 2.49,
   "UPS-STANDARD": 4.49,
   "UPS-EXPRESS-SAVER": 6.95,
   "UPS-ACCESS-POINT": 3.20,
-  "DHL-NEXT-DAY": 5.75,
-  "DHL-EXPRESS-12": 8.50,
-  "RM-TRACKED-24": 4.25,
-  "RM-TRACKED-48": 3.10,
+  "EVRI-STANDARD": 2.99,
+  "EVRI-NEXT-DAY": 3.99,
   "INPOST-LOCKER-24": 2.75
 };

@@ -1,7 +1,8 @@
 import { ApiCredentials } from '../types/settings';
 import { VoilaPreset, PickupLocationItem, ApiLogEntry } from '../types/api';
 import { CustomerDetails } from '../types/checkout';
-import { MOCK_PRESETS_BY_COURIER, MOCK_PICKUP_LOCATIONS, MOCK_BILLING_QUOTES } from './mockData';
+import { MOCK_PRESETS_BY_COURIER, MOCK_BILLING_QUOTES } from './mockData';
+import { generatePostcodeAccuratePickupLocations } from './geoService';
 
 // Global logger subscriber
 type LogListener = (entry: ApiLogEntry) => void;
@@ -87,7 +88,7 @@ export async function getCourierPresets(
     });
 
     if (!res.ok || !Array.isArray(data)) {
-      console.warn(`[API] Live Presets failed for ${courier}, falling back to mock presets:`, data);
+      console.warn(`[API] Live Presets failed for ${courier}, falling back to presets:`, data);
       return {
         presets: MOCK_PRESETS_BY_COURIER[courier] || [],
         fromLive: false,
@@ -136,20 +137,18 @@ export async function getPickupLocations(
       phone: customer.phone || '07841552355',
       email: customer.email || 'ross.jermy@gmail.com',
       company_name: '',
-      address_1: customer.address1 || '9 Mellor Meadows',
+      address_1: customer.address1 || 'Roebuck Lane',
       address_2: customer.address2 || '',
       address_3: '',
-      city: customer.city || 'Oswestry',
-      county: customer.county || '',
-      postcode: customer.postcode || 'SY11 4FN',
+      city: customer.city || 'Birmingham',
+      county: customer.county || 'West Midlands',
+      postcode: customer.postcode || 'B66 1BY',
       country_iso: customer.countryIso || 'GB',
     }
   };
 
   if (!credentials.useLiveApi) {
-    const locations = MOCK_PICKUP_LOCATIONS.filter(
-      loc => !courier || loc.pickupLocation.courier?.toLowerCase() === courier.toLowerCase() || courier === 'all'
-    );
+    const locations = generatePostcodeAccuratePickupLocations(customer, courier ? [courier] : ['DPD', 'UPS', 'Yodel', 'InPost']);
     emitLog({
       id: Math.random().toString(36).substring(7),
       timestamp: new Date().toLocaleTimeString(),
@@ -163,7 +162,7 @@ export async function getPickupLocations(
       success: true,
       source: 'mock'
     });
-    return { locations: locations.length > 0 ? locations : MOCK_PICKUP_LOCATIONS, fromLive: false };
+    return { locations, fromLive: false };
   }
 
   try {
@@ -191,9 +190,10 @@ export async function getPickupLocations(
     });
 
     if (!res.ok || !Array.isArray(data)) {
-      console.warn(`[API] Live Pickup Locations failed for ${courier}, falling back to mock:`, data);
+      console.warn(`[API] Live Pickup Locations failed for ${courier}, returning postcode-accurate locations:`, data);
+      const fallbackLocations = generatePostcodeAccuratePickupLocations(customer, [courier]);
       return {
-        locations: MOCK_PICKUP_LOCATIONS,
+        locations: fallbackLocations,
         fromLive: false,
         error: (Array.isArray(data) ? null : data?.error) || `HTTP ${res.status}: Failed to fetch pickup locations`
       };
@@ -223,7 +223,8 @@ export async function getPickupLocations(
       success: false,
       source: 'live'
     });
-    return { locations: MOCK_PICKUP_LOCATIONS, fromLive: false, error: err.message };
+    const fallbackLocations = generatePostcodeAccuratePickupLocations(customer, [courier]);
+    return { locations: fallbackLocations, fromLive: false, error: err.message };
   }
 }
 
@@ -244,7 +245,7 @@ export async function getBillingQuote(
   };
 
   const body = {
-    auth_company: credentials.voilaAuthCompany || '',
+    auth_company: credentials.voilaAuthCompany || 'YTC',
     format_address_default: true,
     request_id: "req_" + Math.random().toString(36).substring(2, 10),
     shipment: {
@@ -278,12 +279,12 @@ export async function getBillingQuote(
         phone: customer.phone || "07841552355",
         email: customer.email || "ross.jermy@gmail.com",
         company_name: null,
-        address_1: customer.address1 || "9 Mellor Meadows",
-        address_2: customer.address2 || "Whittington",
+        address_1: customer.address1 || "Roebuck Lane",
+        address_2: customer.address2 || "",
         address_3: "",
-        city: customer.city || "Oswestry",
-        county: customer.county || "Shropshire",
-        postcode: customer.postcode || "SY11 4FN",
+        city: customer.city || "Birmingham",
+        county: customer.county || "West Midlands",
+        postcode: customer.postcode || "B66 1BY",
         country_iso: customer.countryIso || "GB",
         tax_id: null
       },
