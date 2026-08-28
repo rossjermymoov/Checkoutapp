@@ -26,6 +26,19 @@ export const ApiInspector: React.FC = () => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const getCurlCommand = (log: ApiLogEntry) => {
+    let cmd = `curl -X ${log.method} '${log.endpoint}'`;
+    if (log.headers) {
+      Object.entries(log.headers).forEach(([k, v]) => {
+        cmd += ` \\\n  -H '${k}: ${v}'`;
+      });
+    }
+    if (log.requestBody) {
+      cmd += ` \\\n  -d '${JSON.stringify(log.requestBody)}'`;
+    }
+    return cmd;
+  };
+
   const currentLog = selectedLog || logs[0] || null;
 
   return (
@@ -113,8 +126,8 @@ export const ApiInspector: React.FC = () => {
                     <span className="font-medium text-gray-700">
                       {isBilling ? 'BillingAPI / get-quote' : log.endpoint.includes('presets') ? 'Voila / Presets' : 'Voila / Locations'}
                     </span>
-                    <span className={`font-bold ${log.success ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      HTTP {log.responseStatus || 200}
+                    <span className={`font-bold ${log.success ? 'text-emerald-600' : log.responseStatus === 405 ? 'text-amber-600' : 'text-rose-600'}`}>
+                      HTTP {log.responseStatus || (log.success ? 200 : 500)}
                     </span>
                   </div>
                 </div>
@@ -136,17 +149,51 @@ export const ApiInspector: React.FC = () => {
                       <span className="text-gray-300 font-semibold">{currentLog.endpoint}</span>
                     </div>
                     <p className="text-gray-400 text-[11px]">
-                      Status: <span className="text-emerald-400 font-bold">{currentLog.responseStatus || 200} OK</span> • Latency: <span className="text-amber-400">{currentLog.durationMs}ms</span>
+                      Status:{' '}
+                      <span
+                        className={`font-bold ${
+                          currentLog.success
+                            ? 'text-emerald-400'
+                            : currentLog.responseStatus === 405
+                            ? 'text-amber-400'
+                            : 'text-rose-400'
+                        }`}
+                      >
+                        HTTP {currentLog.responseStatus || (currentLog.success ? 200 : 500)}{' '}
+                        {currentLog.responseStatus === 405
+                          ? '• 405 Method Not Allowed (Requires POST)'
+                          : currentLog.responseStatus === 401
+                          ? '• 401 Unauthorized (Auth Header Required)'
+                          : currentLog.success
+                          ? '• 200 OK'
+                          : '• Error'}
+                      </span>{' '}
+                      • Latency: <span className="text-amber-400">{currentLog.durationMs}ms</span>
                     </p>
                   </div>
 
-                  <button
-                    onClick={() => handleCopyJson(currentLog, 'all')}
-                    className="p-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition-all flex items-center gap-1 text-[11px]"
-                  >
-                    {copiedId === 'all' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedId === 'all' ? 'Copied' : 'Copy'}</span>
-                  </button>
+                  <div className="flex items-center space-x-1.5">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(getCurlCommand(currentLog));
+                        setCopiedId('curl');
+                        setTimeout(() => setCopiedId(null), 2000);
+                      }}
+                      className="p-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-sky-300 hover:text-white transition-all flex items-center gap-1 text-[11px]"
+                      title="Copy request as curl command"
+                    >
+                      {copiedId === 'curl' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Terminal className="w-3.5 h-3.5" />}
+                      <span>{copiedId === 'curl' ? 'cURL Copied!' : 'Copy cURL'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleCopyJson(currentLog, 'all')}
+                      className="p-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition-all flex items-center gap-1 text-[11px]"
+                    >
+                      {copiedId === 'all' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedId === 'all' ? 'Copied' : 'JSON'}</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Headers Sent */}
