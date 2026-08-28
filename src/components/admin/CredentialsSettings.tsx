@@ -163,7 +163,7 @@ export const CredentialsSettings: React.FC = () => {
               type="text"
               value={credentials.billingCustomerKey || ''}
               onChange={(e) => handleUpdate('billingCustomerKey', e.target.value)}
-              placeholder="b62e9045a42d43468840c6e07b568fcd"
+              placeholder="Leave blank to use the server-configured key"
               className="w-full px-3.5 py-2 bg-gray-50/70 border border-gray-300 rounded-xl text-xs font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
             />
           </div>

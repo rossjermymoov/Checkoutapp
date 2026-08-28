@@ -3,10 +3,10 @@ import { CartProduct, CustomerDetails } from '../types/checkout';
 import { OriginWarehouseAddress, CourierConfig } from '../types/settings';
 
 export const DEFAULT_WAREHOUSE: OriginWarehouseAddress = {
-  name: "Ross Jermy",
+  name: "Dispatch Desk",
   company_name: "Logistics Hub",
   phone: "01111111111",
-  email: "ross.jermy@gmail.com",
+  email: "demo@example.com",
   address_1: "2 Infirmary Street",
   address_2: "",
   city: "Leeds",
@@ -18,10 +18,10 @@ export const DEFAULT_WAREHOUSE: OriginWarehouseAddress = {
 };
 
 export const DEFAULT_CUSTOMER: CustomerDetails = {
-  email: "ross.jermy@gmail.com",
-  firstName: "Ross",
-  lastName: "Jermy",
-  phone: "07841 552 355",
+  email: "demo@example.com",
+  firstName: "Demo",
+  lastName: "Customer",
+  phone: "07000 000000",
   address1: "Roebuck Lane",
   address2: "",
   city: "Birmingham",

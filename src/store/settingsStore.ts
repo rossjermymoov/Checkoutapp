@@ -87,7 +87,7 @@ export const DEFAULT_CREDENTIALS: ApiCredentials = {
   voilaAuthCompany: '',
   billingClientName: 'Moov Parcel',
   billingCustomerDcId: 'Kitloop',
-  billingCustomerKey: 'b62e9045a42d43468840c6e07b568fcd',
+  billingCustomerKey: '',
   billingEndpointUrl: 'https://production.billingapi.co.uk/api/customer-routes/get-quote',
   useLiveApi: true,
 };

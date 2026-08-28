@@ -151,7 +151,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onProceedToShipping 
               type="email"
               value={customer.email}
               onChange={(e) => handleInputChange('email', e.target.value)}
-              placeholder="ross.jermy@gmail.com"
+              placeholder="demo@example.com"
               className="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
             />
           </div>
@@ -244,7 +244,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onProceedToShipping 
                 type="text"
                 value={customer.firstName}
                 onChange={(e) => handleInputChange('firstName', e.target.value)}
-                placeholder="Ross"
+                placeholder="First name"
                 className="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
               />
             </div>
@@ -254,7 +254,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onProceedToShipping 
                 type="text"
                 value={customer.lastName}
                 onChange={(e) => handleInputChange('lastName', e.target.value)}
-                placeholder="Jermy"
+                placeholder="Last name"
                 className="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
               />
             </div>
@@ -326,7 +326,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ onProceedToShipping 
               type="tel"
               value={customer.phone}
               onChange={(e) => handleInputChange('phone', e.target.value)}
-              placeholder="07841 552 355"
+              placeholder="07000 000000"
               className="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
             />
           </div>

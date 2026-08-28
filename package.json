@@ -4,10 +4,12 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"node server/index.js\" \"vite\"",
+    "dev": "concurrently -n server,vite -c blue,magenta \"node server/index.js\" \"vite\"",
     "dev:frontend": "vite",
     "dev:server": "node server/index.js",
     "build": "tsc && vite build",
+    "start": "NODE_ENV=production node server/index.js",
+    "serve": "npm run build && npm start",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -36,5 +38,8 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.3",
     "vite": "^6.1.0"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

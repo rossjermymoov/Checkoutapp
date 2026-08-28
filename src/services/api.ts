@@ -4,6 +4,18 @@ import { CustomerDetails } from '../types/checkout';
 import { MOCK_PRESETS_BY_COURIER, MOCK_BILLING_QUOTES } from './mockData';
 import { generatePostcodeAccuratePickupLocations } from './geoService';
 
+// Neutral fallback address used when the customer form is empty. Deliberately not
+// a real person's contact details — this repo is public.
+const DEMO_ADDRESS = {
+  name: 'Demo Customer',
+  phone: '07000000000',
+  email: 'demo@example.com',
+  address1: 'Roebuck Lane',
+  city: 'Birmingham',
+  county: 'West Midlands',
+  postcode: 'B66 1BY',
+};
+
 // Global logger subscriber
 type LogListener = (entry: ApiLogEntry) => void;
 let logListener: LogListener | null = null;
@@ -36,6 +48,109 @@ async function safeParseResponse(res: Response): Promise<{ data: any; isJson: bo
   }
 }
 
+// Voila returns presets wrapped in an object: { user_presets: [...], system_presets: [...] }
+// It is NOT a bare array. Treating a 200 response as a failure because it isn't an
+// array is what previously caused valid live data to be discarded in favour of mocks.
+export function extractPresets(data: any): VoilaPreset[] {
+  if (Array.isArray(data)) {
+    return data.filter((d) => d && typeof d === 'object');
+  }
+  if (data && typeof data === 'object') {
+    const merged = [
+      ...(Array.isArray(data.user_presets) ? data.user_presets : []),
+      ...(Array.isArray(data.system_presets) ? data.system_presets : []),
+      ...(Array.isArray(data.presets) ? data.presets : []),
+      ...(Array.isArray(data.data) ? data.data : []),
+      ...(Array.isArray(data.services) ? data.services : []),
+    ];
+    // De-duplicate by dc_service_id, preferring the first (user presets win).
+    const seen = new Set<string>();
+    return merged.filter((p: any) => {
+      const key = p?.dc_service_id || String(p?.id ?? '');
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+  return [];
+}
+
+// Pull a human-readable error out of whatever shape Voila returned.
+// Voila's auth failures come back as a bare array of strings, e.g.
+// ["No api-user set in header"] — which is the most useful message there is.
+function extractError(data: any, status: number, fallback: string): string {
+  if (Array.isArray(data) && data.length > 0 && typeof data[0] === 'string') {
+    return data.join(', ');
+  }
+  if (data && typeof data === 'object') {
+    const msg = data.error || data.message || data.detail || (data.raw ? String(data.raw).substring(0, 200) : null);
+    if (msg) return typeof msg === 'string' ? msg : JSON.stringify(msg);
+  }
+  if (typeof data === 'string' && data.trim()) return data.substring(0, 200);
+  return `HTTP ${status}: ${fallback}`;
+}
+
+// Each courier returns pickup locations in its own shape. DPD uses the nested
+// { pickupLocation, distance, addressPoint } structure the UI expects; Yodel
+// returns flat site records with completely different field names. Normalise
+// everything to PickupLocationItem before it reaches the store.
+export function normalisePickupLocations(courier: string, data: any[]): PickupLocationItem[] {
+  return data
+    .map((item: any): PickupLocationItem | null => {
+      if (!item || typeof item !== 'object') return null;
+
+      // DPD / UPS style — already the expected shape.
+      if (item.pickupLocation) {
+        const point = item.addressPoint || item.pickupLocation.addressPoint;
+        return {
+          ...item,
+          pickupLocation: {
+            ...item.pickupLocation,
+            courier: item.pickupLocation.courier || courier,
+          },
+          distance: typeof item.distance === 'number' ? item.distance : 0,
+          addressPoint: point,
+        };
+      }
+
+      // Yodel style — flat site record.
+      if (item.site_number || item.site_name) {
+        const closingTimes = [item.monday_close, item.saturday_close, item.sunday_close].filter(Boolean);
+        const opensLate = closingTimes.some((t: string) => Number(String(t).substring(0, 2)) >= 21);
+        return {
+          pickupLocation: {
+            pickupLocationCode: String(item.site_number || ''),
+            address: {
+              organisation: item.site_name || item.dcl_site_name || 'Yodel Store',
+              street: item.address || '',
+              town: item.city || '',
+              county: item.county || '',
+              postcode: item.postcode || '',
+              countryCode: 'GB',
+            },
+            shortName: item.site_name || undefined,
+            openLate: opensLate,
+            disabledAccess: Boolean(item.disabled_access_code),
+            addressPoint:
+              item.lat != null && item.long != null
+                ? { latitude: Number(item.lat), longitude: Number(item.long) }
+                : undefined,
+            courier,
+          },
+          // Yodel already returns distance in miles.
+          distance: typeof item.miles === 'number' ? item.miles : Number(item.miles) || 0,
+          addressPoint:
+            item.lat != null && item.long != null
+              ? { latitude: Number(item.lat), longitude: Number(item.long) }
+              : undefined,
+        };
+      }
+
+      return null;
+    })
+    .filter((x): x is PickupLocationItem => x !== null);
+}
+
 // 1. HeyVoila / MoovParcel API: Get Presets (GET /api/couriers/v1/MoovParcel/presets)
 export async function getMoovParcelPresets(
   credentials: ApiCredentials
@@ -65,36 +180,23 @@ export async function getMoovParcelPresets(
       responseStatus: res.status,
       responseBody: data,
       durationMs,
-      success: res.ok && isJson && Array.isArray(data),
+      success: res.ok && isJson && extractPresets(data).length > 0,
       source: 'live'
     });
 
-    // Robust parsing: extract preset array from any returned wrapper
-    let presetList: VoilaPreset[] = [];
-    if (Array.isArray(data)) {
-      if (data.length > 0 && typeof data[0] === 'object' && data[0] !== null) {
-        presetList = data;
-      }
-    } else if (data && typeof data === 'object') {
-      if (Array.isArray(data.presets)) presetList = data.presets;
-      else if (Array.isArray(data.user_presets)) presetList = data.user_presets;
-      else if (Array.isArray(data.data)) presetList = data.data;
-      else if (Array.isArray(data.services)) presetList = data.services;
-    }
+    const presetList = extractPresets(data);
 
     if (!res.ok || presetList.length === 0) {
-      let errorMsg = '';
-      if (Array.isArray(data) && data.length > 0 && typeof data[0] === 'string') {
-        errorMsg = data.join(', ');
-      } else if (data && typeof data === 'object') {
-        errorMsg = data.error || data.message || (data.raw ? data.raw.substring(0, 150) : null);
-      } else if (typeof data === 'string') {
-        errorMsg = data;
-      }
       return {
         presets: [],
         fromLive: false,
-        error: errorMsg || `HTTP ${res.status}: ${res.status === 401 ? 'Authentication required. Check api-user and api-token.' : 'Failed to fetch MoovParcel presets'}`
+        error: extractError(
+          data,
+          res.status,
+          res.status === 401
+            ? 'Authentication required. Check api-user and api-token.'
+            : 'Failed to fetch MoovParcel presets'
+        ),
       };
     }
 
@@ -164,20 +266,22 @@ export async function getCourierPresets(
       responseStatus: res.status,
       responseBody: data,
       durationMs,
-      success: res.ok && isJson && Array.isArray(data),
+      success: res.ok && isJson && extractPresets(data).length > 0,
       source: 'live'
     });
 
-    if (!res.ok || !Array.isArray(data)) {
-      console.warn(`[API] Live Presets failed for ${courier}, falling back to presets:`, data);
+    const presetList = extractPresets(data);
+
+    if (!res.ok || presetList.length === 0) {
+      console.warn(`[API] Live presets failed for ${courier}, falling back to mock presets:`, data);
       return {
         presets: MOCK_PRESETS_BY_COURIER[courier] || [],
         fromLive: false,
-        error: (Array.isArray(data) ? null : data?.error) || `HTTP ${res.status}: Failed to fetch presets`
+        error: extractError(data, res.status, `Failed to fetch presets for ${courier}`)
       };
     }
 
-    return { presets: data, fromLive: true };
+    return { presets: presetList, fromLive: true };
   } catch (err: any) {
     const durationMs = Date.now() - startTime;
     emitLog({
@@ -212,18 +316,19 @@ export async function getPickupLocations(
 
   const body = {
     testing: true,
-    auth_company: credentials.voilaAuthCompany || 'YTC',
+    // Left blank when unset so the server can inject VOILA_AUTH_COMPANY.
+    auth_company: credentials.voilaAuthCompany || '',
     address: {
-      name: `${customer.firstName} ${customer.lastName}`.trim() || 'Ross Jermy',
-      phone: customer.phone || '07841552355',
-      email: customer.email || 'ross.jermy@gmail.com',
+      name: `${customer.firstName} ${customer.lastName}`.trim() || DEMO_ADDRESS.name,
+      phone: customer.phone || DEMO_ADDRESS.phone,
+      email: customer.email || DEMO_ADDRESS.email,
       company_name: '',
-      address_1: customer.address1 || 'Roebuck Lane',
+      address_1: customer.address1 || DEMO_ADDRESS.address1,
       address_2: customer.address2 || '',
       address_3: '',
-      city: customer.city || 'Birmingham',
-      county: customer.county || 'West Midlands',
-      postcode: customer.postcode || 'B66 1BY',
+      city: customer.city || DEMO_ADDRESS.city,
+      county: customer.county || DEMO_ADDRESS.county,
+      postcode: customer.postcode || DEMO_ADDRESS.postcode,
       country_iso: customer.countryIso || 'GB',
     }
   };
@@ -271,24 +376,27 @@ export async function getPickupLocations(
     });
 
     if (!res.ok || !Array.isArray(data)) {
-      console.warn(`[API] Live Pickup Locations failed for ${courier}, returning postcode-accurate locations:`, data);
+      console.warn(`[API] Live pickup locations failed for ${courier}, returning generated locations:`, data);
       const fallbackLocations = generatePostcodeAccuratePickupLocations(customer, [courier]);
       return {
         locations: fallbackLocations,
         fromLive: false,
-        error: (Array.isArray(data) ? null : data?.error) || `HTTP ${res.status}: Failed to fetch pickup locations`
+        error: extractError(data, res.status, `Failed to fetch pickup locations for ${courier}`)
       };
     }
 
-    const locationsWithCourier: PickupLocationItem[] = data.map((item: any) => ({
-      ...item,
-      pickupLocation: {
-        ...item.pickupLocation,
-        courier: item.pickupLocation?.courier || courier
-      }
-    }));
+    // Each courier returns a different record shape; normalise before use.
+    const normalised = normalisePickupLocations(courier, data);
 
-    return { locations: locationsWithCourier, fromLive: true };
+    if (normalised.length === 0) {
+      return {
+        locations: generatePostcodeAccuratePickupLocations(customer, [courier]),
+        fromLive: false,
+        error: `${courier} returned ${data.length} locations in an unrecognised format.`
+      };
+    }
+
+    return { locations: normalised, fromLive: true };
   } catch (err: any) {
     const durationMs = Date.now() - startTime;
     emitLog({
@@ -318,10 +426,12 @@ export async function getBillingQuote(
   const startTime = Date.now();
   const endpoint = '/api/proxy/billing-quote';
   const targetUrl = credentials.billingEndpointUrl || 'https://production.billingapi.co.uk/api/customer-routes/get-quote';
+  // Empty values are intentional: the proxy falls back to the server's own
+  // environment variables, so secrets never have to live in the browser.
   const headers: Record<string, string> = {
-    'client_name': credentials.billingClientName || 'Moov Parcel',
-    'customer_dc_id': credentials.billingCustomerDcId || 'Kitloop',
-    'customer_key': credentials.billingCustomerKey || 'b62e9045a42d43468840c6e07b568fcd',
+    'client_name': credentials.billingClientName || '',
+    'customer_dc_id': credentials.billingCustomerDcId || '',
+    'customer_key': credentials.billingCustomerKey || '',
     'x-endpoint-url': targetUrl,
     'Content-Type': 'application/json',
   };
@@ -340,9 +450,9 @@ export async function getBillingQuote(
       reference_2: "",
       delivery_instructions: "",
       ship_from: {
-        name: "Ross",
+        name: "Warehouse",
         phone: "01111111111",
-        email: "ross.jermy@gmail.com",
+        email: "dispatch@example.com",
         company_name: "Logistics Hub",
         address_1: "2 Infirmary Street",
         address_2: "",
@@ -357,16 +467,16 @@ export async function getBillingQuote(
         ioss_number: null
       },
       ship_to: {
-        name: `${customer.firstName} ${customer.lastName}`.trim() || "Ross Jermy",
-        phone: customer.phone || "07841552355",
-        email: customer.email || "ross.jermy@gmail.com",
+        name: `${customer.firstName} ${customer.lastName}`.trim() || DEMO_ADDRESS.name,
+        phone: customer.phone || DEMO_ADDRESS.phone,
+        email: customer.email || DEMO_ADDRESS.email,
         company_name: null,
-        address_1: customer.address1 || "Roebuck Lane",
+        address_1: customer.address1 || DEMO_ADDRESS.address1,
         address_2: customer.address2 || "",
         address_3: "",
-        city: customer.city || "Birmingham",
-        county: customer.county || "West Midlands",
-        postcode: customer.postcode || "B66 1BY",
+        city: customer.city || DEMO_ADDRESS.city,
+        county: customer.county || DEMO_ADDRESS.county,
+        postcode: customer.postcode || DEMO_ADDRESS.postcode,
         country_iso: customer.countryIso || "GB",
         tax_id: null
       },

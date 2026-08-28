@@ -23,22 +23,65 @@ A modern, high-performance checkout application with a dual-pronged architecture
 
 ## 🚀 Quick Start
 
-### 1. Install Dependencies
+### 1. Install dependencies
 ```bash
 npm install
 ```
 
-### 2. Run Development Server
+### 2. Configure credentials
+```bash
+cp .env.example .env
+```
+Fill in `VOILA_API_USER`, `VOILA_API_TOKEN`, `VOILA_AUTH_COMPANY` and `BILLING_CUSTOMER_KEY`.
+**Never commit `.env`.** Credentials live on the server only — they are not shipped to the browser.
+
+> Voila authenticates on the `api-user` and `api-token` headers alone. No Basic Auth,
+> no User-Agent spoofing. A `401 ["No api-user set in header"]` means a value is empty.
+
+### 3. Run in development
 ```bash
 npm run dev
 ```
-- **Customer Checkout UI**: `http://localhost:5173`
-- **Express Proxy Server**: `http://localhost:3001`
+- Checkout UI: `http://localhost:5173`
+- API server: `http://localhost:3001` (Vite forwards `/api/*` to it)
 
-### 3. Production Build
+### 4. Run in production
 ```bash
-npm run build
+npm run serve      # builds, then serves everything from one port
 ```
+The Express server hosts the built bundle **and** the API proxy on `PORT` (default 3001).
+
+---
+
+## 🌐 Deployment
+
+The app is a single Node service — build it, then run `node server/index.js`.
+
+**Docker / Railway / Render / Fly:**
+```bash
+docker build -t checkout-demo .
+docker run -p 3001:3001 --env-file .env checkout-demo
+```
+
+**Host-managed (Railway, Render):** build command `npm run build`, start command `npm start`,
+then set the environment variables from `.env.example` in the host's dashboard.
+
+With `NODE_ENV=production` the merchant console can no longer write credentials to the
+server, so a public demo cannot be repointed by a visitor.
+
+---
+
+## 🏗️ Architecture notes
+
+- **One proxy, not two.** All upstream calls go through `server/index.js`. Vite proxies
+  `/api/*` to it in development and the same file serves `dist/` in production, so dev and
+  prod run identical code. Do not add a second proxy to `vite.config.ts`.
+- **Credential precedence:** request header → local override file → environment variable.
+  A hosted demo works with an empty browser, because the server fills in the gaps.
+- **Courier response shapes differ.** Presets come back as `{ user_presets, system_presets }`,
+  not an array. DPD returns nested `{ pickupLocation, distance, addressPoint }` records;
+  Yodel returns flat `site_*` records. `normalisePickupLocations()` in `src/services/api.ts`
+  reconciles them — extend it when adding a courier.
 
 ---
 
