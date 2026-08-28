@@ -17,12 +17,29 @@ export interface VoilaPreset {
   rule_height_min?: number | null;
   rule_height_max?: number | null;
   rule_supported_countries?: string | null;
+  rule_include_postcodes?: string | null;
+  rule_exclude_postcodes?: string | null;
+  rule_total_shipment_weight_min?: number | null;
+  rule_total_shipment_weight_max?: number | null;
+  rule_value_min?: number | null;
+  rule_value_max?: number | null;
+  transit_time_id?: number | null;
   lead_time?: string | null;
+}
+
+/** One priced, available service as returned by the Billing API get-quote call. */
+export interface QuotedService {
+  /** Billing's service_code — the same value as Voila's dc_service_id. */
+  code: string;
+  name: string;
+  courier: string;
+  price: number;
 }
 
 export interface PresetsApiResponse {
   presets?: VoilaPreset[];
   user_presets?: VoilaPreset[];
+  system_presets?: VoilaPreset[];
 }
 
 export interface PickupLocationDayWindow {

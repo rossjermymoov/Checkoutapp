@@ -1,7 +1,8 @@
 import { CartProduct, CustomerDetails, SelectedShippingOption, OrderConfirmation } from '../types/checkout';
 import { PickupLocationItem } from '../types/api';
 import { DEFAULT_PRODUCTS, DEFAULT_CUSTOMER } from '../services/mockData';
-import { getBillingQuote, getPickupLocations, getCourierPresets } from '../services/api';
+import { getBillingQuote, getPickupLocations } from '../services/api';
+import { getServiceCatalogue, normaliseCourier, checkWeightEligibility } from '../services/serviceCatalogue';
 import { SettingsStore } from './settingsStore';
 
 const CHECKOUT_STORAGE_KEY = 'checkout_demo_state_v2';
@@ -19,6 +20,14 @@ export class CheckoutStore {
   public selectedPickupLocation: PickupLocationItem | null = null;
   public isLoadingRates: boolean = false;
   public isLoadingLocations: boolean = false;
+  /** Why the rate list is empty or incomplete. Surfaced instead of hidden. */
+  public ratesError: string | null = null;
+  public catalogueError: string | null = null;
+  public ratesFromLive: boolean = false;
+  /** Services excluded by a rule, with the reason, e.g. a weight limit. */
+  public unavailableNotices: string[] = [];
+  /** Per-courier drop shop failures, e.g. UPS not enabled on the Voila account. */
+  public dropShopErrors: Record<string, string> = {};
   public couponCode: string = '';
   public discountAmount: number = 0;
   public step: 'information' | 'shipping' | 'payment' | 'confirmation' = 'information';
@@ -170,83 +179,122 @@ export class CheckoutStore {
     return Math.max(0, subtotal - discount + shipping);
   }
 
+  /**
+   * Quote-first rate calculation.
+   *
+   * The Billing API is asked what it will carry to THIS postcode and at what
+   * price. It already applies each service's postcode restrictions and zone
+   * pricing, so its response is the definitive list of what may be sold — we
+   * render exactly that and nothing else. Voila presets are then joined on
+   * dc_service_id purely to decorate each service with its published transit
+   * time and proper name.
+   *
+   * Deliberately absent: any fallback rate. A service that was not quoted is
+   * not offered, because quoting a price the courier has not given us is how
+   * you end up selling DPD into the Highlands at a rate DPD will not honour.
+   */
   public async calculateRates() {
     const settings = SettingsStore.getInstance();
     this.isLoadingRates = true;
+    this.ratesError = null;
+    this.unavailableNotices = [];
     this.notify();
 
     try {
-      const quoteRes = await getBillingQuote(this.customer, settings.credentials, this.getTotalWeightKg());
-      const quotes = quoteRes.quotes;
+      const [quoteRes, catalogueRes] = await Promise.all([
+        getBillingQuote(this.customer, settings.credentials, this.getTotalWeightKg()),
+        getServiceCatalogue(settings.credentials),
+      ]);
 
+      this.ratesFromLive = quoteRes.fromLive;
+      this.ratesError = quoteRes.error || null;
+      this.catalogueError = catalogueRes.error || null;
+
+      const catalogue = catalogueRes.catalogue;
       const subtotal = this.getSubtotal();
-      const isFreeThresholdMet = settings.pricing.freeShippingThreshold !== null && subtotal >= settings.pricing.freeShippingThreshold;
+      const isFreeThresholdMet =
+        settings.pricing.freeShippingThreshold !== null && subtotal >= settings.pricing.freeShippingThreshold;
 
-      const enabledCourierKeys = new Set(
-        settings.couriers.filter(c => c.enabled).map(c => c.key.toLowerCase())
-      );
-      const isCourierEnabled = (courierName: string) => {
-        const clean = (courierName || '').toLowerCase();
-        return Array.from(enabledCourierKeys).some(k => clean.includes(k) || k.includes(clean));
-      };
+      // The merchant console decorates and may suppress; it no longer decides
+      // what exists. Match its entries to quoted services by dc_service_id.
+      const overrides = new Map(settings.services.map((s) => [s.dc_service_id, s]));
+      const totalWeight = this.getTotalWeightKg();
+      const notices: string[] = [];
 
-      const activeServices = settings.services.filter(
-        (s) => s.enabled && !s.isDropShop && isCourierEnabled(s.courier)
-      );
+      const options: SelectedShippingOption[] = quoteRes.services
+        .map((quoted) => {
+          const meta = catalogue.get(quoted.code);
+          const override = overrides.get(quoted.code);
+          const courier = meta?.courier || normaliseCourier(quoted.courier) || 'Unknown';
+          return { quoted, meta, override, courier };
+        })
+        .filter(({ quoted, meta, override, courier }) => {
+          // Explicit suppression in the console wins.
+          if (override && override.enabled === false) return false;
 
-      // If BillingAPI returned live quoted services that aren't yet in configured services, dynamically add them
-      if (quoteRes.fromLive && Array.isArray(quoteRes.rawResponse)) {
-        quoteRes.rawResponse.forEach((liveItem: any) => {
-          const code = liveItem.service_code || liveItem.dc_service_id;
-          const courier = liveItem.courier || 'DPD';
-          if (code && isCourierEnabled(courier) && !activeServices.some(s => s.dc_service_id === code)) {
-            activeServices.unshift({
-              dc_service_id: code,
-              courier: courier.includes('Yodel') ? 'Yodel' : courier.includes('DPD') ? 'DPD' : courier,
-              originalName: liveItem.service_name || code,
-              displayName: liveItem.service_name || code,
-              leadTime: 'Next Working Day (Live Quote)',
-              enabled: true,
-              priority: 0,
-              isDropShop: false,
-              badgeText: 'Live Rate',
-              priceOverride: null,
-            });
+          // A courier the console knows about and has switched off is hidden.
+          // A courier it has never heard of passes through — the Billing API
+          // quoted it, so it is sellable.
+          const known = settings.couriers.find((c) => c.key.toLowerCase() === courier.toLowerCase());
+          if (known && !known.enabled) return false;
+
+          // Weight rules are advisory here; Billing has already applied them.
+          if (meta) {
+            const weight = checkWeightEligibility(meta, totalWeight);
+            if (!weight.allowed) {
+              notices.push(weight.reason || `${quoted.name} is unavailable for this basket`);
+              return false;
+            }
           }
+          return true;
+        })
+        .map(({ quoted, meta, override, courier }) => {
+          const baseRate = override?.priceOverride ?? quoted.price;
+
+          let finalRate = baseRate;
+          if (settings.pricing.markupType === 'fixed') {
+            finalRate += settings.pricing.markupValue;
+          } else if (settings.pricing.markupType === 'percentage') {
+            finalRate = finalRate * (1 + settings.pricing.markupValue / 100);
+          }
+
+          if (isFreeThresholdMet || this.couponCode === 'FREESHIP') {
+            finalRate = 0;
+          }
+
+          return {
+            type: 'courier' as const,
+            serviceId: quoted.code,
+            serviceName: override?.displayName || meta?.name || quoted.name,
+            courier,
+            // Transit time comes from Voila, not from a hardcoded string.
+            leadTime: meta?.leadTime.label || 'Delivery time confirmed at dispatch',
+            leadTimeDays: meta?.leadTime.days ?? null,
+            price: Number(finalRate.toFixed(2)),
+            originalPrice: Number(baseRate.toFixed(2)),
+          };
+        })
+        // Fastest first, then cheapest.
+        .sort((a, b) => {
+          const da = a.leadTimeDays ?? 99;
+          const db = b.leadTimeDays ?? 99;
+          return da !== db ? da - db : a.price - b.price;
         });
-      }
 
-      const options: SelectedShippingOption[] = activeServices.map((service) => {
-        let baseRate = service.priceOverride ?? quotes[service.dc_service_id] ?? settings.pricing.defaultFallbackRate;
-
-        let finalRate = baseRate;
-        if (settings.pricing.markupType === 'fixed') {
-          finalRate += settings.pricing.markupValue;
-        } else if (settings.pricing.markupType === 'percentage') {
-          finalRate = finalRate * (1 + settings.pricing.markupValue / 100);
-        }
-
-        if (isFreeThresholdMet || this.couponCode === 'FREESHIP') {
-          finalRate = 0;
-        }
-
-        return {
-          type: 'courier',
-          serviceId: service.dc_service_id,
-          serviceName: service.displayName || service.originalName,
-          courier: service.courier,
-          leadTime: service.leadTime || 'Next Day',
-          price: Number(finalRate.toFixed(2)),
-          originalPrice: Number(baseRate.toFixed(2)),
-        };
-      });
-
+      this.unavailableNotices = notices;
       this.shippingRates = options;
-      if (this.deliveryMode === 'courier' && (!this.selectedShipping || !options.find(o => o.serviceId === this.selectedShipping?.serviceId))) {
+
+      if (
+        this.deliveryMode === 'courier' &&
+        (!this.selectedShipping || !options.find((o) => o.serviceId === this.selectedShipping?.serviceId))
+      ) {
         this.selectedShipping = options[0] || null;
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Rate calculation error:', error);
+      this.shippingRates = [];
+      this.selectedShipping = null;
+      this.ratesError = error?.message || 'Could not retrieve shipping rates.';
     } finally {
       this.isLoadingRates = false;
       this.notify();
@@ -258,14 +306,27 @@ export class CheckoutStore {
     if (!settings.dropShop.enabled) return;
 
     this.isLoadingLocations = true;
+    this.dropShopErrors = {};
     this.notify();
 
     try {
       const enabledCouriers = settings.dropShop.enabledCouriers;
-      const allLocations: PickupLocationItem[] = [];
 
-      for (const courier of enabledCouriers) {
-        const res = await getPickupLocations(courier, this.customer, settings.credentials);
+      // Query each courier in parallel; one failing courier must not hide the
+      // others. A courier not registered on the Voila account returns 401 here,
+      // which is recorded per courier rather than silently swallowed.
+      const results = await Promise.all(
+        enabledCouriers.map(async (courier) => ({
+          courier,
+          res: await getPickupLocations(courier, this.customer, settings.credentials),
+        }))
+      );
+
+      const allLocations: PickupLocationItem[] = [];
+      for (const { courier, res } of results) {
+        if (res.error) {
+          this.dropShopErrors[courier] = res.error;
+        }
         if (res.locations && res.locations.length > 0) {
           allLocations.push(...res.locations);
         }

@@ -29,6 +29,10 @@ export const DeliverySelector: React.FC<DeliverySelectorProps> = ({
   const selected = checkout.selectedShipping;
   const isLoading = checkout.isLoadingRates;
 
+  const leadDays = rates.map((r) => r.leadTimeDays).filter((d): d is number => d != null);
+  const fastestDays = leadDays.length > 0 ? Math.min(...leadDays) : null;
+  const cheapestPrice = rates.length > 0 ? Math.min(...rates.map((r) => r.price)) : null;
+
   const getCourierLogo = (courierName: string) => {
     const courier = settings.couriers.find(
       (c) => c.key.toLowerCase() === courierName.toLowerCase() || c.name.toLowerCase().includes(courierName.toLowerCase())
@@ -105,14 +109,53 @@ export const DeliverySelector: React.FC<DeliverySelectorProps> = ({
         </div>
       )}
 
+      {/* Quote failure — shown rather than hidden behind fallback pricing */}
+      {!isLoading && checkout.ratesError && (
+        <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-start space-x-3 text-rose-800 text-xs">
+          <AlertCircle className="w-5 h-5 flex-shrink-0 text-rose-600" />
+          <div>
+            <p className="font-semibold text-rose-900">Live rates unavailable</p>
+            <p className="mt-1">{checkout.ratesError}</p>
+            <p className="mt-1 text-rose-700">
+              No prices are shown because none were quoted — a fallback rate would not be one the carrier honours.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Mock mode is stated explicitly so it can never be mistaken for live data */}
+      {!isLoading && !checkout.ratesError && !checkout.ratesFromLive && rates.length > 0 && (
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center space-x-2 text-amber-800 text-xs">
+          <Info className="w-4 h-4 flex-shrink-0 text-amber-600" />
+          <span>
+            <strong>Sandbox data.</strong> These are sample rates, not live carrier quotes.
+          </span>
+        </div>
+      )}
+
+      {/* Services excluded by a rule, with the reason */}
+      {!isLoading && checkout.unavailableNotices.length > 0 && (
+        <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600 space-y-1">
+          {checkout.unavailableNotices.map((notice, i) => (
+            <p key={i} className="flex items-start gap-1.5">
+              <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-gray-400" />
+              <span>{notice}</span>
+            </p>
+          ))}
+        </div>
+      )}
+
       {/* Empty State */}
-      {!isLoading && rates.length === 0 && (
+      {!isLoading && rates.length === 0 && !checkout.ratesError && (
         <div className="p-6 bg-amber-50 border border-amber-200 rounded-xl flex items-start space-x-3 text-amber-800 text-xs">
           <AlertCircle className="w-5 h-5 flex-shrink-0 text-amber-600" />
           <div>
-            <p className="font-semibold text-amber-900">No enabled shipping services available</p>
+            <p className="font-semibold text-amber-900">
+              No services available to {checkout.customer.postcode || 'this postcode'}
+            </p>
             <p className="mt-1">
-              Please open the <strong>Carrier Settings</strong> tab to enable carriers and configure active delivery services.
+              The carrier account returned no priced services for this address. Check the postcode, or review enabled
+              carriers in <strong>Carrier Settings</strong>.
             </p>
           </div>
         </div>
@@ -164,17 +207,14 @@ export const DeliverySelector: React.FC<DeliverySelectorProps> = ({
                         <span className="text-sm font-semibold text-gray-900 truncate">
                           {option.serviceName}
                         </span>
-                        {option.serviceId.includes('DPD-12') && (
+                        {/* Badges derive from the live quote and Voila's published
+                            transit time, not from guessing at service ID strings. */}
+                        {option.leadTimeDays != null && option.leadTimeDays === fastestDays && rates.length > 1 && (
                           <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200">
                             Fastest
                           </span>
                         )}
-                        {option.serviceId.includes('NEXT-DAY') && !option.serviceId.includes('12') && (
-                          <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 border border-sky-200">
-                            Popular
-                          </span>
-                        )}
-                        {option.serviceId.includes('EVRI-STANDARD') && (
+                        {option.price === cheapestPrice && option.leadTimeDays !== fastestDays && rates.length > 1 && (
                           <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
                             Best Value
                           </span>

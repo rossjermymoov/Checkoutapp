@@ -1,5 +1,5 @@
 import { ApiCredentials } from '../types/settings';
-import { VoilaPreset, PickupLocationItem, ApiLogEntry } from '../types/api';
+import { VoilaPreset, PickupLocationItem, ApiLogEntry, QuotedService } from '../types/api';
 import { CustomerDetails } from '../types/checkout';
 import { MOCK_PRESETS_BY_COURIER, MOCK_BILLING_QUOTES } from './mockData';
 import { generatePostcodeAccuratePickupLocations } from './geoService';
@@ -422,7 +422,14 @@ export async function getBillingQuote(
   customer: CustomerDetails,
   credentials: ApiCredentials,
   totalWeightKg: number = 1.5
-): Promise<{ quotes: Record<string, number>; rawResponse?: any; fromLive: boolean; error?: string }> {
+): Promise<{
+  /** Priced, available services. THIS is the list the cart should render. */
+  services: QuotedService[];
+  quotes: Record<string, number>;
+  rawResponse?: any;
+  fromLive: boolean;
+  error?: string;
+}> {
   const startTime = Date.now();
   const endpoint = '/api/proxy/billing-quote';
   const targetUrl = credentials.billingEndpointUrl || 'https://production.billingapi.co.uk/api/customer-routes/get-quote';
@@ -519,7 +526,16 @@ export async function getBillingQuote(
       success: true,
       source: 'mock'
     });
-    return { quotes: MOCK_BILLING_QUOTES, fromLive: false };
+    return {
+      services: Object.entries(MOCK_BILLING_QUOTES).map(([code, price]) => ({
+        code,
+        name: code,
+        courier: '',
+        price: price as number,
+      })),
+      quotes: MOCK_BILLING_QUOTES,
+      fromLive: false,
+    };
   }
 
   try {
@@ -547,33 +563,50 @@ export async function getBillingQuote(
     });
 
     if (!res.ok) {
-      console.warn('[API] Live Quote failed, falling back to mock quotes:', data);
+      // No silent fallback to mock pricing: an unavailable quote must not be
+      // dressed up as a sellable rate. The caller surfaces this to the user.
+      console.warn('[API] Live quote failed:', data);
       return {
-        quotes: MOCK_BILLING_QUOTES,
+        services: [],
+        quotes: {},
         fromLive: false,
-        error: data?.error || `HTTP ${res.status}: Quote endpoint error`
+        error: extractError(data, res.status, 'Quote endpoint error')
       };
     }
 
+    // The Billing API returns exactly the services it will carry to this
+    // address, already filtered by each service's postcode rules and priced
+    // for the destination zone. Take it as the authority on availability.
+    const services: QuotedService[] = [];
     const priceMap: Record<string, number> = {};
+
     if (Array.isArray(data)) {
       data.forEach((item: any) => {
-        const code = item.service_code || item.dc_service_id || item.service_name;
-        const total = item.price?.total ?? item.total ?? item.price;
+        const code = item.service_code || item.dc_service_id;
+        const total = item.price?.total ?? item.total ?? (typeof item.price === 'number' ? item.price : undefined);
         if (code && typeof total === 'number') {
+          services.push({
+            code,
+            name: item.service_name || code,
+            courier: item.courier || '',
+            price: total,
+          });
           priceMap[code] = total;
         }
       });
     } else if (data && typeof data === 'object') {
-      Object.keys(data).forEach(k => {
+      // Defensive: some deployments return a flat { code: price } map.
+      Object.keys(data).forEach((k) => {
         if (typeof data[k] === 'number') {
+          services.push({ code: k, name: k, courier: '', price: data[k] });
           priceMap[k] = data[k];
         }
       });
     }
 
     return {
-      quotes: Object.keys(priceMap).length > 0 ? priceMap : MOCK_BILLING_QUOTES,
+      services,
+      quotes: priceMap,
       rawResponse: data,
       fromLive: true
     };
@@ -592,6 +625,6 @@ export async function getBillingQuote(
       success: false,
       source: 'live'
     });
-    return { quotes: MOCK_BILLING_QUOTES, fromLive: false, error: err.message };
+    return { services: [], quotes: {}, fromLive: false, error: err.message };
   }
 }
