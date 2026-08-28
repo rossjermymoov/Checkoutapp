@@ -88,7 +88,10 @@ export const ServiceCatalogue: React.FC = () => {
       leadTime: meta.leadTime.label,
       enabled: true,
       priority: settings.services.length + 1,
-      isDropShop: /drop|pickup|parcelshop|locker|c2c/i.test(meta.name),
+      // Doorstep by default. The merchant classifies pickup-point services
+      // themselves in Couriers & Services — guessing from the service name is
+      // exactly the kind of assumption this codebase has suffered from.
+      isDropShop: false,
       badgeText: null,
       priceOverride: null,
     };

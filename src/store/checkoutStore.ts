@@ -15,7 +15,10 @@ export class CheckoutStore {
   public customer: CustomerDetails = DEFAULT_CUSTOMER;
   public deliveryMode: 'courier' | 'drop_shop' = 'courier';
   public selectedShipping: SelectedShippingOption | null = null;
+  /** Quoted doorstep services. */
   public shippingRates: SelectedShippingOption[] = [];
+  /** Quoted services the merchant classified as pickup-point deliveries. */
+  public dropShopRates: SelectedShippingOption[] = [];
   public pickupLocations: PickupLocationItem[] = [];
   public selectedPickupLocation: PickupLocationItem | null = null;
   public isLoadingRates: boolean = false;
@@ -124,20 +127,47 @@ export class CheckoutStore {
     this.notify();
   }
 
+  /**
+   * The quoted pickup-point service that will carry to this courier's shops.
+   * Returns null when the courier has no priced drop-off service, in which case
+   * its locations cannot be sold.
+   */
+  public getDropShopServiceForCourier(courier?: string): SelectedShippingOption | null {
+    const key = normaliseCourier(courier).toLowerCase();
+    if (!key) return null;
+    return this.dropShopRates.find((r) => normaliseCourier(r.courier).toLowerCase() === key) || null;
+  }
+
   public selectPickupLocation(location: PickupLocationItem) {
     this.selectedPickupLocation = location;
     const settings = SettingsStore.getInstance();
     const isFree = settings.pricing.freeShippingThreshold && this.getSubtotal() >= settings.pricing.freeShippingThreshold;
-    const basePrice = 2.49;
-    const finalPrice = isFree || this.couponCode === 'FREESHIP' ? 0 : basePrice;
     const org = location.pickupLocation.address?.organisation || location.pickupLocation.shortName || 'Drop Shop';
+
+    // Price comes from the carrier's own quote for the drop-off service, not a
+    // flat constant. There was previously a hardcoded £2.49 here, applied to
+    // every courier and every destination regardless of what was quoted.
+    const service = this.getDropShopServiceForCourier(location.pickupLocation.courier);
+    if (!service) {
+      this.selectedShipping = null;
+      this.ratesError = `No priced pickup-point service is available for ${
+        location.pickupLocation.courier || 'this courier'
+      }. Select that service in Settings → Service Catalogue and mark it as a pickup point.`;
+      this.notify();
+      return;
+    }
+
+    const basePrice = service.price;
+    const finalPrice = isFree || this.couponCode === 'FREESHIP' ? 0 : basePrice;
 
     this.selectedShipping = {
       type: 'drop_shop',
-      serviceId: location.pickupLocation.pickupLocationCode,
-      serviceName: `${org} (${location.pickupLocation.courier || 'Pickup'})`,
-      courier: location.pickupLocation.courier || 'DPD',
-      leadTime: `Next Day Collection (${location.distance.toFixed(1)} miles away)`,
+      serviceId: service.serviceId,
+      serviceName: `${service.serviceName} — ${org}`,
+      courier: service.courier,
+      leadTime: service.leadTime,
+      leadTimeDays: service.leadTimeDays,
+      isDropShop: true,
       price: finalPrice,
       originalPrice: basePrice,
       dropShopDetails: {
@@ -298,6 +328,7 @@ export class CheckoutStore {
             // Transit time comes from Voila, not from a hardcoded string.
             leadTime: meta?.leadTime.label || 'Delivery time confirmed at dispatch',
             leadTimeDays: meta?.leadTime.days ?? null,
+            isDropShop: Boolean(override?.isDropShop),
             price: Number(finalRate.toFixed(2)),
             originalPrice: Number(baseRate.toFixed(2)),
           };
@@ -310,13 +341,20 @@ export class CheckoutStore {
         });
 
       this.unavailableNotices = notices;
-      this.shippingRates = options;
+
+      // Doorstep and pickup-point services are the same quoted services split by
+      // the merchant's own classification. A pickup point is not a product in
+      // its own right — it is a destination for one of these services, and it
+      // is priced at that service's quoted rate.
+      this.shippingRates = options.filter((o) => !o.isDropShop);
+      this.dropShopRates = options.filter((o) => o.isDropShop);
 
       if (
         this.deliveryMode === 'courier' &&
-        (!this.selectedShipping || !options.find((o) => o.serviceId === this.selectedShipping?.serviceId))
+        (!this.selectedShipping ||
+          !this.shippingRates.find((o) => o.serviceId === this.selectedShipping?.serviceId))
       ) {
-        this.selectedShipping = options[0] || null;
+        this.selectedShipping = this.shippingRates[0] || null;
       }
     } catch (error: any) {
       console.error('Rate calculation error:', error);
@@ -333,12 +371,29 @@ export class CheckoutStore {
     const settings = SettingsStore.getInstance();
     if (!settings.dropShop.enabled) return;
 
+    // Pickup points are priced from quoted services, so rates must exist first.
+    if (this.shippingRates.length === 0 && this.dropShopRates.length === 0 && !this.isLoadingRates) {
+      await this.calculateRates();
+    }
+
     this.isLoadingLocations = true;
     this.dropShopErrors = {};
     this.notify();
 
     try {
-      const enabledCouriers = settings.dropShop.enabledCouriers;
+      // Only query couriers that actually have a priced pickup-point service.
+      // Showing shops we cannot price is what led to the flat £2.49.
+      const sellable = new Set(this.dropShopRates.map((r) => normaliseCourier(r.courier)));
+      const enabledCouriers = settings.dropShop.enabledCouriers.filter((c) =>
+        sellable.has(normaliseCourier(c))
+      );
+
+      if (enabledCouriers.length === 0) {
+        this.pickupLocations = [];
+        this.isLoadingLocations = false;
+        this.notify();
+        return;
+      }
 
       // Query each courier in parallel; one failing courier must not hide the
       // others. A courier not registered on the Voila account returns 401 here,
@@ -383,7 +438,18 @@ export class CheckoutStore {
     }
   }
 
-  public placeOrder(paymentMethod: string = 'Credit Card'): OrderConfirmation {
+  /**
+   * Returns null when no shipping has been selected. There is deliberately no
+   * default: inventing a "DPD Standard Delivery £4.95" line put a service on a
+   * real order confirmation that nobody had quoted or chosen.
+   */
+  public placeOrder(paymentMethod: string = 'Credit Card'): OrderConfirmation | null {
+    if (!this.selectedShipping) {
+      this.ratesError = 'Choose a delivery option before placing the order.';
+      this.notify();
+      return null;
+    }
+
     const order: OrderConfirmation = {
       orderNumber: `ORD-${Math.floor(100000 + Math.random() * 900000)}`,
       createdAt: new Date().toLocaleDateString('en-GB', {
@@ -395,15 +461,7 @@ export class CheckoutStore {
       }),
       customer: { ...this.customer },
       items: [...this.cart],
-      shipping: this.selectedShipping || {
-        type: 'courier',
-        serviceId: 'DEFAULT',
-        serviceName: 'Standard Delivery',
-        courier: 'DPD',
-        leadTime: '1-2 Days',
-        price: 4.95,
-        originalPrice: 4.95
-      },
+      shipping: this.selectedShipping,
       subtotal: this.getSubtotal(),
       discount: this.discountAmount,
       shippingPrice: this.selectedShipping ? this.selectedShipping.price : 0,

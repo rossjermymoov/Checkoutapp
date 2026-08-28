@@ -36,7 +36,6 @@ export interface PricingRules {
   markupType: 'none' | 'fixed' | 'percentage';
   markupValue: number;
   freeShippingThreshold: number | null; // e.g. £50
-  defaultFallbackRate: number;
 }
 
 export interface DropShopSettings {

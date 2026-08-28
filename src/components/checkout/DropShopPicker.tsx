@@ -115,10 +115,30 @@ export const DropShopPicker: React.FC<DropShopPickerProps> = ({
         <div className="p-6 bg-amber-50 border border-amber-200 rounded-xl flex items-start space-x-3 text-amber-800 text-xs">
           <AlertCircle className="w-5 h-5 flex-shrink-0 text-amber-600" />
           <div>
-            <p className="font-semibold text-amber-900">No pickup points found near {checkout.customer.postcode}</p>
-            <p className="mt-1">
-              Try searching with another postcode or switch back to standard door-to-door delivery.
-            </p>
+            {checkout.dropShopRates.length === 0 ? (
+              <>
+                <p className="font-semibold text-amber-900">No pickup-point services configured</p>
+                <p className="mt-1">
+                  Pickup points are priced by the service that carries them. In{' '}
+                  <strong>Settings → Couriers &amp; Services</strong>, mark the drop-off services you sell (for example
+                  DPD Drop Off Next Day, Yodel C2C) as pickup-point services.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="font-semibold text-amber-900">
+                  No pickup points found near {checkout.customer.postcode}
+                </p>
+                <p className="mt-1">
+                  Try another postcode, or switch back to door-to-door delivery.
+                </p>
+              </>
+            )}
+            {Object.entries(checkout.dropShopErrors).map(([courier, err]) => (
+              <p key={courier} className="mt-2 text-amber-700">
+                <strong>{courier}:</strong> {err}
+              </p>
+            ))}
           </div>
         </div>
       )}
@@ -181,10 +201,27 @@ export const DropShopPicker: React.FC<DropShopPickerProps> = ({
                     </div>
                   </div>
 
+                  {/* Price is the carrier's quote for the drop-off service that
+                      serves this shop — not a flat rate stamped on every card. */}
                   <div className="text-right flex-shrink-0">
-                    <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 block">
-                      £2.49 Collect
-                    </span>
+                    {(() => {
+                      const service = checkout.getDropShopServiceForCourier(loc.pickupLocation.courier);
+                      if (!service) {
+                        return (
+                          <span className="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-gray-100 text-gray-500 border border-gray-200 block">
+                            Not priced
+                          </span>
+                        );
+                      }
+                      return (
+                        <>
+                          <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 block">
+                            {service.price === 0 ? 'Free' : `£${service.price.toFixed(2)}`}
+                          </span>
+                          <span className="text-[10px] text-gray-400 block mt-1">{service.leadTime}</span>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>

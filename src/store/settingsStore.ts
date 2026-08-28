@@ -35,7 +35,6 @@ const DEFAULT_PRICING: PricingRules = {
   markupType: 'none',
   markupValue: 0,
   freeShippingThreshold: 150,
-  defaultFallbackRate: 4.95,
 };
 
 const DEFAULT_DROPSHOP: DropShopSettings = {

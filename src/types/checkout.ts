@@ -36,6 +36,8 @@ export interface SelectedShippingOption {
   leadTime: string;
   /** Working days in transit, from the Voila preset. null when not published. */
   leadTimeDays?: number | null;
+  /** Merchant-set: this service delivers to a pickup point, not a doorstep. */
+  isDropShop?: boolean;
   price: number;
   originalPrice: number;
   dropShopDetails?: {
