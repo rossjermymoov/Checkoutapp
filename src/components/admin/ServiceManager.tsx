@@ -75,6 +75,16 @@ export const ServiceManager: React.FC = () => {
     return 'DPD'; // Default fallback
   };
 
+  // Diagnostic state for last live call
+  const [lastCallDetails, setLastCallDetails] = useState<{
+    targetUrl: string;
+    method: string;
+    status?: number;
+    headersSent?: Record<string, string>;
+    rawResponse?: any;
+    timestamp?: string;
+  } | null>(null);
+
   // Convert raw Voila presets into candidate objects
   const processPresetsIntoCandidates = (presets: VoilaPreset[]) => {
     const mapped: ImportCandidate[] = presets.map((p) => {
@@ -106,11 +116,18 @@ export const ServiceManager: React.FC = () => {
     setFetchSuccessMessage(`Retrieved ${presets.length} services from MoovParcel endpoint. Select the ones you care about below and assign them to DPD, UPS, or Yodel.`);
   };
 
-  // Live GET call to /api/couriers/v1/MoovParcel/presets
+  // Live GET call to https://app.heyvoila.io/api/couriers/v1/MoovParcel/presets
   const handleFetchMoovParcelPresets = async () => {
     setIsFetching(true);
     setFetchError(null);
     setFetchSuccessMessage(null);
+
+    const fullUrl = `https://app.heyvoila.io/api/couriers/v1/MoovParcel/presets`;
+    const headersSent = {
+      'api-user': apiUser.trim(),
+      'api-token': apiToken.trim() ? `${apiToken.trim().substring(0, 4)}...${apiToken.trim().slice(-4)}` : '(empty)',
+      'api-key': apiToken.trim() ? `${apiToken.trim().substring(0, 4)}...${apiToken.trim().slice(-4)}` : '(empty)',
+    };
 
     // Save auth headers if user changed them
     settings.updateCredentials({
@@ -125,15 +142,30 @@ export const ServiceManager: React.FC = () => {
         voilaApiToken: apiToken.trim(),
       });
 
+      setLastCallDetails({
+        targetUrl: fullUrl,
+        method: 'GET',
+        headersSent,
+        rawResponse: res.presets.length > 0 ? res.presets : (res.error || 'Empty response'),
+        timestamp: new Date().toLocaleTimeString(),
+      });
+
       if (res.fromLive && res.presets && res.presets.length > 0) {
         processPresetsIntoCandidates(res.presets);
       } else if (res.presets && res.presets.length > 0) {
         processPresetsIntoCandidates(res.presets);
         setFetchSuccessMessage(`Loaded ${res.presets.length} presets (${res.error || 'Running in sandbox mode'}).`);
       } else {
-        setFetchError(res.error || 'No presets returned from api/couriers/v1/MoovParcel/presets. Check your api-user / api-token headers or paste raw JSON directly.');
+        setFetchError(res.error || 'No presets returned from https://app.heyvoila.io/api/couriers/v1/MoovParcel/presets. Check your credentials or paste raw JSON directly.');
       }
     } catch (err: any) {
+      setLastCallDetails({
+        targetUrl: fullUrl,
+        method: 'GET',
+        headersSent,
+        rawResponse: { error: err.message },
+        timestamp: new Date().toLocaleTimeString(),
+      });
       setFetchError(err.message || 'Error fetching MoovParcel presets');
     } finally {
       setIsFetching(false);
@@ -271,10 +303,13 @@ export const ServiceManager: React.FC = () => {
           <div>
             <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
               <RefreshCw className="w-4 h-4 text-indigo-600" />
-              Fetch Presets (<code className="text-xs text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded font-mono">GET api/couriers/v1/MoovParcel/presets</code>)
+              <span>Fetch Presets from HeyVoila MoovParcel Endpoint</span>
             </h4>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Pull all live routing presets from your MoovParcel account
+            <p className="text-xs text-gray-500 mt-1 flex flex-wrap items-center gap-1.5">
+              <span>Full Destination URL:</span>
+              <code className="text-xs text-indigo-800 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md font-mono font-semibold">
+                GET https://app.heyvoila.io/api/couriers/v1/MoovParcel/presets
+              </code>
             </p>
           </div>
         </div>
@@ -289,7 +324,7 @@ export const ServiceManager: React.FC = () => {
               type="text"
               value={apiUser}
               onChange={(e) => setApiUser(e.target.value)}
-              placeholder="e.g. ross.jermy@gmail.com"
+              placeholder="e.g. Moov Parcel Master or email"
               className="w-full px-3 py-2 bg-gray-50/70 border border-gray-300 rounded-xl text-xs font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
             />
           </div>
@@ -302,7 +337,7 @@ export const ServiceManager: React.FC = () => {
               type="password"
               value={apiToken}
               onChange={(e) => setApiToken(e.target.value)}
-              placeholder="Enter api token / key"
+              placeholder="Enter Voila API token / key"
               className="w-full px-3 py-2 bg-gray-50/70 border border-gray-300 rounded-xl text-xs font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
             />
           </div>
@@ -315,20 +350,44 @@ export const ServiceManager: React.FC = () => {
               className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 transition-all"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
-              <span>{isFetching ? 'Fetching...' : '⚡ Fetch MoovParcel Presets'}</span>
+              <span>{isFetching ? 'Contacting Voila...' : '⚡ Fetch MoovParcel Presets'}</span>
             </button>
           </div>
         </div>
+
+        {/* Live Call Diagnostic Panel */}
+        {lastCallDetails && (
+          <div className="p-3 bg-gray-900 text-gray-100 rounded-xl text-xs font-mono space-y-1.5 border border-gray-800">
+            <div className="flex items-center justify-between text-gray-400 text-[11px] pb-1 border-b border-gray-800">
+              <span className="text-indigo-400 font-bold">📡 Live API Call Inspector ({lastCallDetails.timestamp})</span>
+              <span>Proxy &rarr; Upstream</span>
+            </div>
+            <div>
+              <span className="text-emerald-400 font-bold">Destination:</span>{' '}
+              <span className="text-yellow-300">{lastCallDetails.method} {lastCallDetails.targetUrl}</span>
+            </div>
+            <div>
+              <span className="text-emerald-400 font-bold">Headers Sent:</span>{' '}
+              <span className="text-gray-300">api-user: {lastCallDetails.headersSent?.['api-user'] || '(none)'} | api-token: {lastCallDetails.headersSent?.['api-token'] || '(none)'}</span>
+            </div>
+            <div className="pt-1">
+              <span className="text-emerald-400 font-bold">Response:</span>{' '}
+              <span className={fetchError ? 'text-rose-400' : 'text-emerald-300'}>
+                {typeof lastCallDetails.rawResponse === 'object' ? JSON.stringify(lastCallDetails.rawResponse).substring(0, 200) : String(lastCallDetails.rawResponse)}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Error / Success Feedback */}
         {fetchError && (
           <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
             <div className="space-y-1">
-              <p className="font-semibold">Endpoint Message:</p>
+              <p className="font-semibold">Voila API Message:</p>
               <p className="font-mono text-[11px]">{fetchError}</p>
               <p className="text-gray-600 text-[11px] mt-1">
-                Tip: You can also use the <strong>"Paste Raw JSON"</strong> button above to paste the services payload directly.
+                Tip: If you already have the response or list from Postman / Voila, you can also click the <strong>"Paste Raw JSON"</strong> button above to paste it instantly.
               </p>
             </div>
           </div>
